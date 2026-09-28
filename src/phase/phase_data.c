@@ -112,7 +112,7 @@ void phase_data_free(phase_data *pd) {
 
 void phase_data_update_p_mismatch(phase_data *pd, float p_mismatch) {
     if (p_mismatch < 0.0 || p_mismatch > 1.0 || !isfinite(p_mismatch)) {
-        util_exit("fast-beagle: mismatch probability %g outside [0, 1]", (double)p_mismatch);
+        util_exit(PROGRAM ": mismatch probability %g outside [0, 1]", (double)p_mismatch);
     }
     pd->p_mismatch = p_mismatch;
 }

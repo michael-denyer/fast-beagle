@@ -28,7 +28,7 @@
 
 /* The first two lines of Main.SHORT_HELP, naming this program. Beagle's third
  * line points to a usage text that this program does not print. */
-static const char BANNER[] = "fast-beagle: a C port of beagle.27Feb25.75f.jar (version 5.5)\n"
+static const char BANNER[] = PROGRAM ": a C port of beagle.27Feb25.75f.jar (version 5.5)\n"
                              "Copyright (C) 2014-2024 Brian L. Browning\n";
 
 int64_t run_stats_nanos(void) {
@@ -215,7 +215,7 @@ void run_stats_close(run_stats *rs, int64_t n_targ_markers, int64_t n_markers) {
     duo_print(rs, "%-31s%s MB\n", "Max memory:", grouped(buf, max_rss_bytes(&ru) / (1024 * 1024)));
     char ts[64];
     duo_print(rs, "\nEnd time: %s\n", time_stamp(ts, sizeof ts));
-    duo_print(rs, "fast-beagle finished\n");
+    duo_print(rs, PROGRAM " finished\n");
     util_exit_log(NULL);
     if (fclose(rs->log) != 0) util_exit("Error writing %s.log", rs->par->out);
 }

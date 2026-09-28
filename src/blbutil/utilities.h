@@ -15,6 +15,10 @@
 
 #include "jcompat/jrandom.h"
 
+/* Main.PROGRAM: this program's name, which also starts the messages of the
+ * errors that only fast-beagle raises. */
+#define PROGRAM "fast-beagle"
+
 /* Utilities.exit: prints the message to standard error and exits with status 1.
  * Only the first caller reports; a later or concurrent caller blocks until the
  * process exits. */
