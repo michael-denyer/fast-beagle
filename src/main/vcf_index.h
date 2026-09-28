@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* beagle-c only: the tabix index of a BGZF VCF, byte-identical to
+/* fast-beagle only: the tabix index of a BGZF VCF, byte-identical to
  * tabix -p vcf. Records are collected with their uncompressed end offsets as
  * the VCF is written; virtual offsets are read from the closed file, as a
  * multithreaded BGZF writer cannot report them. */

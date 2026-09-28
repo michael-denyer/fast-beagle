@@ -1,5 +1,5 @@
 /*
- * This file is part of beagle-c, a C port of Beagle. It is free software:
+ * This file is part of fast-beagle, a C port of Beagle. It is free software:
  * you can redistribute it and/or modify it under the terms of the GNU General
  * Public License as published by the Free Software Foundation, either version 3
  * of the License, or (at your option) any later version. See LICENSE.
@@ -49,7 +49,7 @@ void parallel_for(int n_threads, int n_items, void *workers, size_t worker_size,
     thread_arg *args = util_malloc((size_t)n_threads * sizeof *args);
     for (int t = 0; t < n_threads; ++t) {
         args[t] = (thread_arg){&sh, worker_at(workers, worker_size, t)};
-        if (t > 0 && pthread_create(&threads[t], NULL, run, &args[t]) != 0) util_exit("beagle-c: cannot create thread");
+        if (t > 0 && pthread_create(&threads[t], NULL, run, &args[t]) != 0) util_exit("fast-beagle: cannot create thread");
     }
     run(&args[0]);
     for (int t = 1; t < n_threads; ++t) pthread_join(threads[t], NULL);
@@ -97,7 +97,7 @@ void parallel_ordered(int n_threads, int n_items, int window, void *workers, siz
     ordered o = {.n_items = n_items, .window = window, .next = 0, .consumed = 0, .build = build};
     if (pthread_mutex_init(&o.mu, NULL) != 0 || pthread_cond_init(&o.built_cv, NULL) != 0
             || pthread_cond_init(&o.room_cv, NULL) != 0) {
-        util_exit("beagle-c: cannot create thread");
+        util_exit("fast-beagle: cannot create thread");
     }
     o.built = util_malloc((size_t)window * sizeof *o.built);
     for (int s = 0; s < window; ++s) o.built[s] = false;
@@ -105,7 +105,7 @@ void parallel_ordered(int n_threads, int n_items, int window, void *workers, siz
     ordered_arg *args = util_malloc((size_t)n_threads * sizeof *args);
     for (int t = 0; t < n_threads; ++t) {
         args[t] = (ordered_arg){&o, worker_at(workers, worker_size, t)};
-        if (pthread_create(&threads[t], NULL, run_ordered, &args[t]) != 0) util_exit("beagle-c: cannot create thread");
+        if (pthread_create(&threads[t], NULL, run_ordered, &args[t]) != 0) util_exit("fast-beagle: cannot create thread");
     }
     for (int item = 0; item < n_items; ++item) {
         pthread_mutex_lock(&o.mu);

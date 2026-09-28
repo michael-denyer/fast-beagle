@@ -3,7 +3,7 @@
  * Ported to C from Beagle 5.5 (27Feb25) blbutil/BlockLineReader.java and
  * the parseLines step of vcf/RefIt.java; modified 2026.
  *
- * This file is part of beagle-c, a C port of Beagle. It is free software:
+ * This file is part of fast-beagle, a C port of Beagle. It is free software:
  * you can redistribute it and/or modify it under the terms of the GNU General
  * Public License as published by the Free Software Foundation, either version 3
  * of the License, or (at your option) any later version. See LICENSE.
@@ -165,8 +165,8 @@ block_reader *block_reader_open(line_reader *reader, kstring_t line, const vcf_h
     pthread_mutex_init(&r->mutex, NULL);
     pthread_cond_init(&r->changed, NULL);
     for (int j = 0; j < BLOCK_READER_SLOTS; ++j) r->free_slots[r->n_free++] = &r->slots[j];
-    if (pthread_create(&r->reader_thread, NULL, read_batches, r) != 0) util_exit("beagle-c: cannot create thread");
-    if (pthread_create(&r->parser_thread, NULL, parse_batches, r) != 0) util_exit("beagle-c: cannot create thread");
+    if (pthread_create(&r->reader_thread, NULL, read_batches, r) != 0) util_exit("fast-beagle: cannot create thread");
+    if (pthread_create(&r->parser_thread, NULL, parse_batches, r) != 0) util_exit("fast-beagle: cannot create thread");
     return r;
 }
 

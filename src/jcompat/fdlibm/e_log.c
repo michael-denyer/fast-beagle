@@ -1,5 +1,5 @@
 /* From netlib fdlibm 5.3 (https://www.netlib.org/fdlibm/), which java.lang.StrictMath
- * specifies. Modified 2026 for beagle-c: word access through memcpy, K&R branches
+ * specifies. Modified 2026 for fast-beagle: word access through memcpy, K&R branches
  * removed, left shifts of signed values made unsigned, a dead endianness probe
  * removed, functions renamed jmath_*. */
 #include "words.h"

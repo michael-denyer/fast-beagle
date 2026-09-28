@@ -4,7 +4,7 @@
  * imp/ImpLSBaum.java, imp/StateProbsFactory.java and imp/StateProbs.java;
  * modified 2026.
  *
- * This file is part of beagle-c, a C port of Beagle. It is free software:
+ * This file is part of fast-beagle, a C port of Beagle. It is free software:
  * you can redistribute it and/or modify it under the terms of the GNU General
  * Public License as published by the Free Software Foundation, either version 3
  * of the License, or (at your option) any later version. See LICENSE.
