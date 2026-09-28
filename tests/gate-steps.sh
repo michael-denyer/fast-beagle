@@ -5,11 +5,13 @@
 # build/check-<name>.log.
 #
 # Usage: [GATE_TIER=c] [GATE_FUZZ=random] tests/gate-steps.sh <root>
-# Needs Java 21, htslib, uv, and PLINK2 naming the pinned plink2 binary (see
-# tests/check-bgen.sh). GATE_TIER=c runs only the checks that compare the C
+# Needs Java 21, htslib and uv; the full tier also needs PLINK2 naming the
+# pinned plink2 binary (see tests/check-bgen.sh). GATE_TIER=c runs only the checks that compare the C
 # binary against recorded results; Java then only builds the bref3 fixtures.
-# It skips every check that runs Java or the jar alongside it, the sanitizers
-# and the TLA+ model, and it runs the saved fuzz regressions but no new fuzz
+# It skips every check that runs Java or the jar alongside it, the
+# fixture-cache check, the sanitizers and the TLA+ model. It checks the
+# BGEN output against the hashes in tests/bgen-hashes.txt instead of
+# plink2, and runs the saved fuzz regressions but no new fuzz
 # examples. The default is the full gate. GATE_FUZZ=random fuzzes new examples
 # instead of the fixed 200.
 # shellcheck disable=SC2329  # java_build, oracle_trace and trace_threads run through step
@@ -25,6 +27,8 @@ mkdir -p build
 fail=0
 tier=${GATE_TIER:-full}
 case $tier in full|c) ;; *) echo "GATE_TIER must be full or c, not $tier"; exit 2 ;; esac
+bgen_oracle=live
+[ "$tier" = c ] && bgen_oracle=recorded
 fuzz_args=(--examples 200)
 case ${GATE_FUZZ:-fixed} in
   fixed) ;;
@@ -66,7 +70,7 @@ trace_threads() {
 }
 
 step fixtures tests/fetch-fixtures.sh
-step cases python3 tests/check_cases.py
+full_step cases python3 tests/check_cases.py
 full_step jcompat make check-jcompat
 step tracker make check-tracker
 step interval make check-interval
@@ -85,7 +89,7 @@ step bgen-unit make check-bgen-unit
 step records make check-records
 step vcf-index make check-vcf-index
 step tbi make check-tbi
-step bgen tests/check-bgen.sh
+step bgen env BGEN_ORACLE="$bgen_oracle" tests/check-bgen.sh
 # shellcheck disable=SC2086  # the seam list splits into arguments
 full_step trace tests/check-trace.sh $SEAMS
 full_step sanitizers tests/check-sanitizers.sh

@@ -12,8 +12,15 @@
 # bgen-bits and bgen-chr-set values must exit 1 with a message, as must every
 # refused run.
 #
-# Usage: PLINK2=<plink2 v2.0.0-a.7.8> tests/check-bgen.sh
-# uv must be on PATH; it runs check_bgen_reader.py with its pinned bgen-reader.
+# Every run's .bgen, .sample and .info must also hash as tests/bgen-hashes.txt
+# records. BGEN_ORACLE=recorded checks those hashes instead of plink2,
+# bgen-reader and the Python checks, and needs neither plink2 nor uv. RECORD=1 rewrites tests/bgen-hashes.txt from a
+# live run in which every other check passes.
+#
+# Usage: PLINK2=<plink2 v2.0.0-a.7.8> [RECORD=1] tests/check-bgen.sh
+#        BGEN_ORACLE=recorded tests/check-bgen.sh
+# The live checks need uv on PATH; it runs check_bgen_reader.py with its pinned
+# bgen-reader.
 # BEAGLE overrides the binary (default build/beagle). CASES restricts the run
 # to the named cases.
 set -uo pipefail
@@ -23,14 +30,23 @@ source "$ROOT/tests/cases.sh"
 BEAGLE=${BEAGLE:-$ROOT/build/beagle}
 PLINK2_VERSION="PLINK v2.0.0-a.7.8"
 
-if [ -z "${PLINK2:-}" ] || [ ! -x "$PLINK2" ]; then
-  echo "FAIL PLINK2 must name a plink2 binary (got '${PLINK2:-}')"; exit 1
+HASHES="$ROOT/tests/bgen-hashes.txt"
+ORACLE=${BGEN_ORACLE:-live}
+case $ORACLE in live|recorded) ;; *) echo "FAIL BGEN_ORACLE must be live or recorded, not $ORACLE"; exit 1 ;; esac
+if [ -n "${RECORD:-}" ] && { [ "$ORACLE" != live ] || [ -n "${CASES:-}" ]; }; then
+  echo "FAIL RECORD=1 needs the live oracle and every case"; exit 1
 fi
-version=$("$PLINK2" --version 2>&1)
-if [[ "$version" != "$PLINK2_VERSION"* ]]; then
-  echo "FAIL $PLINK2 is '$version', want $PLINK2_VERSION"; exit 1
+
+if [ "$ORACLE" = live ]; then
+  if [ -z "${PLINK2:-}" ] || [ ! -x "$PLINK2" ]; then
+    echo "FAIL PLINK2 must name a plink2 binary (got '${PLINK2:-}')"; exit 1
+  fi
+  version=$("$PLINK2" --version 2>&1)
+  if [[ "$version" != "$PLINK2_VERSION"* ]]; then
+    echo "FAIL $PLINK2 is '$version', want $PLINK2_VERSION"; exit 1
+  fi
+  command -v uv > /dev/null || { echo "FAIL uv is not on PATH; it runs tests/check_bgen_reader.py (https://docs.astral.sh/uv/)"; exit 1; }
 fi
-command -v uv > /dev/null || { echo "FAIL uv is not on PATH; it runs tests/check_bgen_reader.py (https://docs.astral.sh/uv/)"; exit 1; }
 
 
 TABLES=("$ROOT/tests/oracle-cases.txt" "$ROOT/tests/bgen-cases.txt")
@@ -91,6 +107,19 @@ read_case() {  # name
   read -r expect tags args <<< "$(cases "${TABLES[@]}" | awk -v n="$1" '$1 == n {$1 = ""; print; exit}')"
 }
 
+# The run's row in tests/bgen-hashes.txt must match the SHA-256 prefixes of its
+# .bgen, .sample and .info. Under RECORD=1 the row is collected instead. Sets
+# VERDICT on a mismatch.
+check_hashes() {  # out
+  local f got=() want
+  for f in "$1.bgen" "$1.sample" "$1.info"; do got+=("$($SHA "$f" | cut -c1-16)"); done
+  if [ -n "${RECORD:-}" ]; then echo "${got[*]} $key" >> "$OUT/hashes"; return; fi
+  want=$(awk -v k="$key" '!/^#/ && NF {h = $1 " " $2 " " $3; $1 = $2 = $3 = ""; sub(/^ +/, "")
+    if ($0 == k) {print h; exit}}' "$HASHES")
+  [ -n "$want" ] || { VERDICT="has no row in tests/bgen-hashes.txt"; return 1; }
+  [ "${got[*]}" = "$want" ] || { VERDICT="hashes ${got[*]}, recorded $want"; return 1; }
+}
+
 run_plink2() {  # vcf out beagle-args...
   local vcf=$1 out=$2 bits=8 a; shift 2
   local flags=()
@@ -108,16 +137,20 @@ run_plink2() {  # vcf out beagle-args...
 
 # bgen=plink2 must write the .bgen and .sample that plink2 writes from the VCF.
 check_match() {  # label out beagle-args...
-  local label=$1 b=$2.beagle p=$2.plink2 got decoded; shift 2
+  local label=$1 b=$2.beagle p=$2.plink2 got decoded detail=; shift 2
   case_verdict "$expect" "$args" "$b" $THREADS "$BEAGLE" bgen=plink2 "$@" \
     || { failed "$label beagle $VERDICT $(tail -1 "$b.run.log")"; return; }
-  run_plink2 "$b.vcf.gz" "$p" "$@" || { failed "$label plink2 exit=$?: $(grep -m1 '^Error' "$p.plink2.log")"; return; }
-  if ! cmp "$b.bgen" "$p.bgen" || ! cmp "$b.sample" "$p.sample"; then
-    failed "$label bgen or sample differs"; return
+  if [ "$ORACLE" = live ]; then
+    run_plink2 "$b.vcf.gz" "$p" "$@" || { failed "$label plink2 exit=$?: $(grep -m1 '^Error' "$p.plink2.log")"; return; }
+    if ! cmp "$b.bgen" "$p.bgen" || ! cmp "$b.sample" "$p.sample"; then
+      failed "$label bgen or sample differs"; return
+    fi
+    got=$(python3 "$ROOT/tests/check_bgen_info.py" "$b.bgen" "$b.info" "$b.vcf.gz") || { failed "$label .info: $got"; return; }
+    decoded=$(bgen_reader "$b.bgen") || { failed "$label bgen-reader: $decoded"; return; }
+    detail="$(head -c 12 "$b.bgen" | tail -c 4 | od -An -tu4 | tr -d ' ') variants, .info $got, bgen-reader agrees, "
   fi
-  got=$(python3 "$ROOT/tests/check_bgen_info.py" "$b.bgen" "$b.info" "$b.vcf.gz") || { failed "$label .info: $got"; return; }
-  decoded=$(bgen_reader "$b.bgen") || { failed "$label bgen-reader: $decoded"; return; }
-  pass "$label $(head -c 12 "$b.bgen" | tail -c 4 | od -An -tu4 | tr -d ' ') variants, .info $got, bgen-reader agrees"
+  check_hashes "$b" || { failed "$label $VERDICT"; return; }
+  pass "$label ${detail}hashes as recorded"
 }
 
 # Both tools must fail: bgen=plink2 with a message naming the cause and no
@@ -127,6 +160,7 @@ check_both_fail() {  # label out message beagle-args...
   local label=$1 b=$2.beagle v=$2.vcfonly p=$2.plink2 message=$3; shift 3
   case_run "$args" "$b" $THREADS "$BEAGLE" bgen=plink2 "$@"
   refused "$b.run.log" $? "$message" "$b.bgen" "$b.info" "$b.sample" || { failed "$label bgen=plink2 $VERDICT"; return; }
+  [ "$ORACLE" = live ] || { pass "$label fails: $message"; return; }
   case_verdict "$expect" "$args" "$v" $THREADS "$BEAGLE" || { failed "$label beagle without bgen= $VERDICT"; return; }
   if run_plink2 "$v.vcf.gz" "$p" "$@"; then failed "$label plink2 succeeded"; return; fi
   pass "$label fails in both: $(grep -m1 -A1 '^Error' "$p.plink2.log" | tr '\n' ' ')"
@@ -135,25 +169,30 @@ check_both_fail() {  # label out message beagle-args...
 # bgen=phased: check_bgen_phased.py finds the BGEN consistent with the VCF,
 # and plink2 loads the BGEN unless the case is nonautosome.
 check_phased() {  # label out beagle-args...
-  local label=$1 b=$2.phased rows decoded got; shift 2
+  local label=$1 b=$2.phased rows decoded got detail=; shift 2
   case_verdict "$expect" "$args" "$b" $THREADS "$BEAGLE" bgen=phased "$@" \
     || { failed "$label beagle $VERDICT $(tail -1 "$b.run.log")"; return; }
-  got=$(python3 "$ROOT/tests/check_bgen_phased.py" "$b.bgen" "$b.vcf.gz") \
-    || { failed "$label: $got"; return; }
-  if ! has_tag "$tags" nonautosome; then
-    "$PLINK2" --bgen "$b.bgen" ref-first --sample "$b.sample" --export vcf --out "$b.plink2" > "$b.plink2.log" 2>&1 \
-      || { failed "$label plink2 --bgen: $(grep -m1 '^Error' "$b.plink2.log")"; return; }
+  if [ "$ORACLE" = live ]; then
+    got=$(python3 "$ROOT/tests/check_bgen_phased.py" "$b.bgen" "$b.vcf.gz") \
+      || { failed "$label: $got"; return; }
+    if ! has_tag "$tags" nonautosome; then
+      "$PLINK2" --bgen "$b.bgen" ref-first --sample "$b.sample" --export vcf --out "$b.plink2" > "$b.plink2.log" 2>&1 \
+        || { failed "$label plink2 --bgen: $(grep -m1 '^Error' "$b.plink2.log")"; return; }
+    fi
+    rows=$(python3 "$ROOT/tests/check_bgen_info.py" "$b.bgen" "$b.info" "$b.vcf.gz") \
+      || { failed "$label .info: $rows"; return; }
+    decoded=$(bgen_reader "$b.bgen") || { failed "$label bgen-reader: $decoded"; return; }
+    detail="$got, .info $rows, bgen-reader agrees, "
   fi
-  rows=$(python3 "$ROOT/tests/check_bgen_info.py" "$b.bgen" "$b.info" "$b.vcf.gz") \
-    || { failed "$label .info: $rows"; return; }
-  decoded=$(bgen_reader "$b.bgen") || { failed "$label bgen-reader: $decoded"; return; }
-  pass "$label $got, .info $rows, bgen-reader agrees"
+  check_hashes "$b" || { failed "$label $VERDICT"; return; }
+  pass "$label ${detail}hashes as recorded"
 }
 
 check_run() {  # name mode outcome beagle-args...
-  local name=$1 mode=$2 outcome=$3 expect tags args label out; shift 3
+  local name=$1 mode=$2 outcome=$3 expect tags args label out key; shift 3
   read_case "$name"
   label="$name${*:+ $*}"
+  key="$name $mode${*:+ $*}"
   out="$OUT/$name$(printf '%s' "$*" | tr -c 'a-z0-9.' '_')"
   case "$mode $outcome" in
     "plink2 ok") check_match "$label" "$out" "$@" ;;
@@ -216,4 +255,14 @@ while IFS='|' read -r run outcome; do
 done < <(all_runs)
 [ -n "${CASES:-}" ] || for a in "${BAD_ARGS[@]}"; do check_bad_args "$a"; done
 [ -n "${CASES:-}" ] || partial_runs
+if [ -n "${RECORD:-}" ] && [ "$fail" -eq 0 ]; then
+  {
+    echo "# The SHA-256 prefixes of the .bgen, .sample and .info that each run of"
+    echo "# tests/check-bgen.sh writes, then the run: case, mode and added arguments."
+    echo "# Written by RECORD=1 PLINK2=<plink2> tests/check-bgen.sh after plink2,"
+    echo "# bgen-reader and our own decoder accept every file."
+    LC_ALL=C sort -k4 "$OUT/hashes"
+  } > "$HASHES"
+  pass "recorded $(wc -l < "$OUT/hashes" | tr -d ' ') runs in tests/bgen-hashes.txt"
+fi
 exit $fail

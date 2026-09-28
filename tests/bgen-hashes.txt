@@ -1,0 +1,93 @@
+# The SHA-256 prefixes of the .bgen, .sample and .info that each run of
+# tests/check-bgen.sh writes, then the run: case, mode and added arguments.
+# Written by RECORD=1 PLINK2=<plink2> tests/check-bgen.sh after plink2,
+# bgen-reader and our own decoder accept every file.
+2d314fd96019e52d 131c1dd8db5030f8 b162271d1b13eb1c gt phased
+d747ceb5d095a785 131c1dd8db5030f8 b162271d1b13eb1c gt plink2
+cb3cf73de2c0f745 131c1dd8db5030f8 524bdd7a230fe4de gt plink2 bgen-min-maf=0.05
+7b2ce9d8517a2148 d01637260311fad6 9ad458ebd5c9af4c gt-573 phased
+bd77a098d1b3b064 d01637260311fad6 9ad458ebd5c9af4c gt-573 plink2
+dc8aa92815a0c8e0 131c1dd8db5030f8 4cc575d4048c3c4d gt-common phased
+66f98218ee484756 131c1dd8db5030f8 4cc575d4048c3c4d gt-common plink2
+9a28106261f2e357 131c1dd8db5030f8 4cc575d4048c3c4d gt-common-map phased
+f2de232e34539c6b 131c1dd8db5030f8 4cc575d4048c3c4d gt-common-map plink2
+2b6292b2c284c1f9 d017746ada47bb04 3940d7c2aac51a6a gt-excl phased
+ea54fb0f31915707 d017746ada47bb04 3940d7c2aac51a6a gt-excl plink2
+40272dae1b845263 8eb8347cc1cc011e b162271d1b13eb1c gt-ibs2 phased
+86095ad8fcd63329 8eb8347cc1cc011e b162271d1b13eb1c gt-ibs2 plink2
+d6b7e2b08d5ff893 8eb8347cc1cc011e b162271d1b13eb1c gt-ibs2-miss phased
+4127e2d0b8724079 8eb8347cc1cc011e b162271d1b13eb1c gt-ibs2-miss plink2
+7346ddc718bf60df 131c1dd8db5030f8 b162271d1b13eb1c gt-map phased
+e56bf5c92d72f223 131c1dd8db5030f8 b162271d1b13eb1c gt-map plink2
+9a5d3a685534cb6b 131c1dd8db5030f8 b162271d1b13eb1c gt-miss phased
+2755793164e634cb 131c1dd8db5030f8 b162271d1b13eb1c gt-miss plink2
+5a29758e73f5490f 131c1dd8db5030f8 dca1d8e896964cb0 gt-multi phased
+a7a8673db2d17b9b 131c1dd8db5030f8 c4a12afaa7827d99 gt-multi plink2
+f44441c319dd0d96 7a6e6916aa8884b8 b162271d1b13eb1c gt-phased phased
+a13d3c1e211e8190 7a6e6916aa8884b8 b162271d1b13eb1c gt-phased plink2
+bf8786bb3c0bc546 7a6e6916aa8884b8 b162271d1b13eb1c gt-phased plink2 bgen-bits=1
+c0d7c6504da0dd0d 7a6e6916aa8884b8 b162271d1b13eb1c gt-phased plink2 bgen-bits=12
+4821d3137c2a3c41 7a6e6916aa8884b8 b162271d1b13eb1c gt-phased plink2 bgen-bits=16
+4e82e66252b67f84 7a6e6916aa8884b8 b162271d1b13eb1c gt-phased plink2 bgen-bits=3
+c11c551ec5bf4ab4 131c1dd8db5030f8 c0b0bd26901566be gt-rare phased
+cfbb9813eef5b33c 131c1dd8db5030f8 c0b0bd26901566be gt-rare plink2
+e404bf7bbbcf0972 131c1dd8db5030f8 b162271d1b13eb1c gt-states phased
+a95f90d8b2dc852c 131c1dd8db5030f8 b162271d1b13eb1c gt-states plink2
+7346ddc718bf60df 131c1dd8db5030f8 b162271d1b13eb1c gt-udigit phased
+e56bf5c92d72f223 131c1dd8db5030f8 b162271d1b13eb1c gt-udigit plink2
+0843714c0564ea24 131c1dd8db5030f8 b2ceb55fcff62110 gt-x phased
+45bbc33898eb89a3 a23fa985fc083b96 2807f8b972e337aa imp phased
+de18ef0e873c95a7 a23fa985fc083b96 2807f8b972e337aa imp phased bgen-bits=16
+b04e80017872123a a23fa985fc083b96 2807f8b972e337aa imp phased bgen-bits=3
+508bb459c8c16739 a23fa985fc083b96 2807f8b972e337aa imp plink2
+c1117110ebaffa72 a23fa985fc083b96 2807f8b972e337aa imp plink2 bgen-bits=1
+495aa77d7767d1d9 a23fa985fc083b96 2807f8b972e337aa imp plink2 bgen-bits=12
+b6d4d234a6844407 a23fa985fc083b96 2807f8b972e337aa imp plink2 bgen-bits=16
+c6a4c80365bddce4 a23fa985fc083b96 2807f8b972e337aa imp plink2 bgen-bits=3
+bfd5b24a2a2dfeaa a23fa985fc083b96 9374cdf32d5a9f6c imp plink2 bgen-min-dr2=0.3 bgen-min-maf=0.05
+96f1979fc6cbfcff a23fa985fc083b96 9374cdf32d5a9f6c imp plink2 bgen-min-dr2=0.3 bgen-min-maf=0.05 bgen-bits=12
+a9b2be9df99e6915 a23fa985fc083b96 4e057e7348b62413 imp plink2 bgen-min-dr2=0.30
+45bbc33898eb89a3 a23fa985fc083b96 2807f8b972e337aa imp-apgp phased
+508bb459c8c16739 a23fa985fc083b96 2807f8b972e337aa imp-apgp plink2
+0a1b0e92d6fd6e42 a23fa985fc083b96 60e615665845bb61 imp-bigref phased
+a586101683c74f3e a23fa985fc083b96 60e615665845bb61 imp-bigref plink2
+45bbc33898eb89a3 a23fa985fc083b96 2807f8b972e337aa imp-bref3 phased
+508bb459c8c16739 a23fa985fc083b96 2807f8b972e337aa imp-bref3 plink2
+526d9afa38c3c134 a23fa985fc083b96 e16d52a2e80d910d imp-bref3-end phased
+c0e6fc709489bf9d a23fa985fc083b96 e16d52a2e80d910d imp-bref3-end plink2
+0f94a2fc2fd244d2 a23fa985fc083b96 916f0c0fddfd7975 imp-bref3-excl phased
+77691c03f0b6dd4b a23fa985fc083b96 916f0c0fddfd7975 imp-bref3-excl plink2
+4a60aff89c52916f 638f1f0ee0fbb10b 9762fc0c069cb946 imp-bref3-excls phased
+556f4b20334090db 638f1f0ee0fbb10b 9762fc0c069cb946 imp-bref3-excls plink2
+f01296fd57394344 a23fa985fc083b96 a43103c13f805894 imp-bref3-multi phased
+cf3545bfb717b875 a23fa985fc083b96 153ace169e14aa43 imp-bref3-multi plink2
+b6c2e30e05186406 a23fa985fc083b96 494cc304b83f4a75 imp-chr38 phased
+4357681faf72c391 a23fa985fc083b96 494cc304b83f4a75 imp-chr38 plink2 bgen-chr-set=38
+4e0576846c90f683 a23fa985fc083b96 69d803e75174173b imp-chr38 plink2 bgen-chr-set=38 bgen-min-dr2=0.3 bgen-bits=3
+ffd1159a0abcf82e a23fa985fc083b96 2f768d349c0e9b77 imp-chrom phased
+b0c69a7f4e71b050 a23fa985fc083b96 2f768d349c0e9b77 imp-chrom plink2
+d12f21f9ea182df0 a23fa985fc083b96 3e35f18b4c16f81a imp-chroms phased
+7aa80eda94de289c a23fa985fc083b96 3e35f18b4c16f81a imp-chroms plink2 bgen-chr-set=38
+67dc3503eb1e62d2 a23fa985fc083b96 e5585931f637fdaf imp-evict phased
+5a74d3544b71a231 a23fa985fc083b96 e5585931f637fdaf imp-evict plink2
+9a03b7f3a3c50bdd a23fa985fc083b96 586cf09ca14974d4 imp-excl phased
+2b252eaaff0b0573 a23fa985fc083b96 586cf09ca14974d4 imp-excl plink2
+477e3e9c3b78ef37 a23fa985fc083b96 874622f1e202b441 imp-gap phased
+d897986089df518d a23fa985fc083b96 874622f1e202b441 imp-gap plink2
+fff86e401383d05d a23fa985fc083b96 e881b07b7cea7503 imp-hap22 phased
+928a7c74214adf0e a23fa985fc083b96 e881b07b7cea7503 imp-hap22 plink2
+e63157c7835af063 a23fa985fc083b96 e881b07b7cea7503 imp-hap22 plink2 bgen-bits=3
+c7165788feb8a5de a23fa985fc083b96 389dcb837a7538d3 imp-map phased
+b6de011c5d0c11bd a23fa985fc083b96 389dcb837a7538d3 imp-map plink2
+4fc7b894cf4b7b27 a23fa985fc083b96 68aca98184ff8872 imp-map plink2 bgen-min-maf=0.2
+9befd2231388472c a23fa985fc083b96 91b55fea9128adbd imp-miss phased
+9e87d85bbbaab4e2 a23fa985fc083b96 91b55fea9128adbd imp-miss plink2
+f01296fd57394344 a23fa985fc083b96 a43103c13f805894 imp-multi phased
+6d40c33166d2a4e9 a23fa985fc083b96 a43103c13f805894 imp-multi phased bgen-bits=1
+cf3545bfb717b875 a23fa985fc083b96 153ace169e14aa43 imp-multi plink2
+44f3309d29c069a0 a23fa985fc083b96 a345b233f5632f6f imp-states phased
+158cd6a4953b473b a23fa985fc083b96 a345b233f5632f6f imp-states plink2
+9fbf1c660dc0bf4b a23fa985fc083b96 38bdeb1f018b90ad imp-x phased
+2e68975d566a3c8b a23fa985fc083b96 38bdeb1f018b90ad imp-x phased bgen-bits=12
+032c468e7719659f a23fa985fc083b96 b162271d1b13eb1c ref phased
+ce3d34dc3ba385b3 a23fa985fc083b96 b162271d1b13eb1c ref plink2
