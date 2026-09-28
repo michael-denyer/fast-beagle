@@ -3,7 +3,7 @@
  * Ported to C from Beagle 5.5 (27Feb25) phase/CodedSteps.java and the parts
  * of vcf/XRefGT.java it uses; modified 2026.
  *
- * This file is part of beagle-c, a C port of Beagle. It is free software:
+ * This file is part of fast-beagle, a C port of Beagle. It is free software:
  * you can redistribute it and/or modify it under the terms of the GNU General
  * Public License as published by the Free Software Foundation, either version 3
  * of the License, or (at your option) any later version. See LICENSE.
@@ -42,7 +42,7 @@ static void step_task(void *worker, int j) {
     for (int h = 0; h < cs->n_haps; ++h) {
         int absent;
         khiter_t k = kh_put(seq_index, w->map, (khint32_t)bit_array_hash(cs->haps[h], from, to), &absent);
-        if (absent < 0) util_exit("beagle-c: out of memory");
+        if (absent < 0) util_exit("fast-beagle: out of memory");
         if (absent) kh_value(w->map, k) = n_seq++;
         seq[h] = kh_value(w->map, k);
     }

@@ -3,7 +3,7 @@
  * Ported to C from Beagle 5.5 (27Feb25) main/Par.java and
  * blbutil/Validate.java; modified 2026.
  *
- * This file is part of beagle-c, a C port of Beagle. It is free software:
+ * This file is part of fast-beagle, a C port of Beagle. It is free software:
  * you can redistribute it and/or modify it under the terms of the GNU General
  * Public License as published by the Free Software Foundation, either version 3
  * of the License, or (at your option) any later version. See LICENSE.
@@ -16,7 +16,7 @@
 
 #include "beagleutil/chrom_interval.h"
 
-/* beagle-c only: the bgen= output mode */
+/* fast-beagle only: the bgen= output mode */
 typedef enum { BGEN_NONE, BGEN_PLINK2, BGEN_PHASED } bgen_mode;
 
 /* Beagle's command-line parameters, with Java's defaults and ranges. */
@@ -41,10 +41,10 @@ typedef struct {
     int window_markers, nthreads;
     int64_t seed;
 
-    /* beagle-c only: directory for trace seams, or NULL */
+    /* fast-beagle only: directory for trace seams, or NULL */
     const char *trace;
 
-    /* beagle-c only: BGEN output, its bits per probability, its plink2
+    /* fast-beagle only: BGEN output, its bits per probability, its plink2
      * --chr-set autosome count, and its plink2 --extract-if-info "DR2 >= x"
      * and --maf filters; bgen_min_maf 0 means no filter */
     bgen_mode bgen;
@@ -53,7 +53,7 @@ typedef struct {
     bool has_bgen_min_dr2;
     double bgen_min_dr2, bgen_min_maf;
 
-    /* beagle-c only: also write <out>.vcf.gz.tbi */
+    /* fast-beagle only: also write <out>.vcf.gz.tbi */
     bool tbi;
 } par;
 

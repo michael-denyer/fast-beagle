@@ -2,7 +2,7 @@
  * Copyright (C) 2014-2021 Brian L. Browning
  * Ported to C from Beagle 5.5 (27Feb25) ints/IntIntMap.java; modified 2026.
  *
- * This file is part of beagle-c, a C port of Beagle. It is free software:
+ * This file is part of fast-beagle, a C port of Beagle. It is free software:
  * you can redistribute it and/or modify it under the terms of the GNU General
  * Public License as published by the Free Software Foundation, either version 3
  * of the License, or (at your option) any later version. See LICENSE.
@@ -44,7 +44,7 @@ int int_int_map_get(const int_int_map *m, int key, int sentinel) {
 void int_int_map_put(int_int_map *m, int key, int value) {
     int absent;
     khiter_t k = kh_put(int_int, m->h, key, &absent);
-    if (absent < 0) util_exit("beagle-c: out of memory");
+    if (absent < 0) util_exit("fast-beagle: out of memory");
     kh_value(m->h, k) = value;
 }
 

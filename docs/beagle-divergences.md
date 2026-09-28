@@ -56,11 +56,11 @@ Both tools exit with status 1 when they refuse a run. fast-beagle prints the sam
 
 When a command line has more than one unrecognized parameter, both tools list them in one message. Beagle lists them in hash-map order. fast-beagle lists them in the order you gave them.
 
-A few errors exist only in fast-beagle, such as a refused `ped=` or a failure to start a thread. Their messages start with `beagle-c:`.
+A few errors exist only in fast-beagle, such as a refused `ped=` or a failure to start a thread. Their messages start with `fast-beagle:`.
 
 ## Parameters
 
-fast-beagle accepts every parameter that Beagle's parser accepts, with the same default, the same valid range and the same meaning. That includes the parameters Beagle's usage text leaves out (`initial-lr`, `step-scale`, `rare`, `imp-segment`, `imp-step`, `imp-nsteps`, `buffer` and `truth`). The one exception is `ped=`. Beagle checks that the file exists and then ignores it. fast-beagle stops with `beagle-c: the ped= parameter is not supported`. Remove `ped=` from a Beagle command line before you run it with fast-beagle.
+fast-beagle accepts every parameter that Beagle's parser accepts, with the same default, the same valid range and the same meaning. That includes the parameters Beagle's usage text leaves out (`initial-lr`, `step-scale`, `rare`, `imp-segment`, `imp-step`, `imp-nsteps`, `buffer` and `truth`). The one exception is `ped=`. Beagle checks that the file exists and then ignores it. fast-beagle stops with `fast-beagle: the ped= parameter is not supported`. Remove `ped=` from a Beagle command line before you run it with fast-beagle.
 
 fast-beagle adds these parameters. Beagle refuses each of them as an unrecognized parameter.
 

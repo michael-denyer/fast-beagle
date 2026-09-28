@@ -28,7 +28,7 @@ PLINK2="$PLINK2_ARM64" "$ROOT/tests/gate-steps.sh" "$ROOT" || fail=1
 
 # Linux x86_64: a copy of the checkout without build outputs, in a directory
 # the docker VM can mount (colima mounts the home directory).
-LINUX_DIR="$HOME/.cache/beagle-c-check/$(basename "$ROOT")"
+LINUX_DIR="$HOME/.cache/fast-beagle-check/$(basename "$ROOT")"
 mkdir -p "$LINUX_DIR"
 rsync -a --delete --exclude build --exclude data --exclude .git "$ROOT/" "$LINUX_DIR/"
 echo "linux x86_64 (docker)"

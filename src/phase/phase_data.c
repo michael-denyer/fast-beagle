@@ -3,7 +3,7 @@
  * Ported to C from Beagle 5.5 (27Feb25) phase/PhaseData.java,
  * phase/EstPhase.java and vcf/MarkerMap.java pRecomb; modified 2026.
  *
- * This file is part of beagle-c, a C port of Beagle. It is free software:
+ * This file is part of fast-beagle, a C port of Beagle. It is free software:
  * you can redistribute it and/or modify it under the terms of the GNU General
  * Public License as published by the Free Software Foundation, either version 3
  * of the License, or (at your option) any later version. See LICENSE.
@@ -112,7 +112,7 @@ void phase_data_free(phase_data *pd) {
 
 void phase_data_update_p_mismatch(phase_data *pd, float p_mismatch) {
     if (p_mismatch < 0.0 || p_mismatch > 1.0 || !isfinite(p_mismatch)) {
-        util_exit("beagle-c: mismatch probability %g outside [0, 1]", (double)p_mismatch);
+        util_exit("fast-beagle: mismatch probability %g outside [0, 1]", (double)p_mismatch);
     }
     pd->p_mismatch = p_mismatch;
 }

@@ -3,7 +3,7 @@
  * Ported to C from Beagle 5.5 (27Feb25) bref/Bref3It.java,
  * bref/Bref3Reader.java and bref/Bref3Header.java; modified 2026.
  *
- * This file is part of beagle-c, a C port of Beagle. It is free software:
+ * This file is part of fast-beagle, a C port of Beagle. It is free software:
  * you can redistribute it and/or modify it under the terms of the GNU General
  * Public License as published by the Free Software Foundation, either version 3
  * of the License, or (at your option) any later version. See LICENSE.
@@ -111,7 +111,7 @@ static void read_utf(bref3_it *it, kstring_t *out) {
     out->l = 0;
     for (int j = 0; j < n_units; ++j) {
         unsigned u = units[j];
-        if (u == 0) util_exit("beagle-c: a string in %s contains a NUL character", it->path);
+        if (u == 0) util_exit("fast-beagle: a string in %s contains a NUL character", it->path);
         if (u >= 0xd800 && u <= 0xdbff && j + 1 < n_units && units[j + 1] >= 0xdc00 && units[j + 1] <= 0xdfff) {
             put_code_point(out, 0x10000 + ((u - 0xd800) << 10) + (units[j + 1] - 0xdc00));
             ++j;
@@ -244,19 +244,19 @@ static seq_group *read_hap_to_seq(bref3_it *it, int n_seq) {
     for (int k = 0; k < it->n_haps; ++k) {
         int offset = it->included_haps[k] << 1;
         g->hap_to_seq[k] = it->bytes[offset] << 8 | it->bytes[offset + 1];
-        if (n_seq > 0 && g->hap_to_seq[k] >= n_seq) util_exit("beagle-c: inconsistent data in %s", it->path);
+        if (n_seq > 0 && g->hap_to_seq[k] >= n_seq) util_exit("fast-beagle: inconsistent data in %s", it->path);
     }
     return g;
 }
 
 /* Bref3Reader.readHapRecord */
 static void read_hap_record(bref3_it *it, ref_gt_rec *rec, seq_group *g) {
-    if (g->n_seq == 0) util_exit("beagle-c: inconsistent data in %s", it->path);
+    if (g->n_seq == 0) util_exit("fast-beagle: inconsistent data in %s", it->path);
     int n_alleles = marker_n_alleles(&rec->marker);
     uint8_t *seq_to_allele = util_malloc((size_t)g->n_seq);
     read_fully(it, seq_to_allele, (size_t)g->n_seq);
     for (int s = 0; s < g->n_seq; ++s) {
-        if (seq_to_allele[s] >= n_alleles) util_exit("beagle-c: inconsistent data in %s", it->path);
+        if (seq_to_allele[s] >= n_alleles) util_exit("fast-beagle: inconsistent data in %s", it->path);
     }
     ref_gt_rec_set_seq_coded(rec, g, seq_to_allele);
 }
