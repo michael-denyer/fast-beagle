@@ -44,7 +44,11 @@ Every case table row holds a name, the expected outcome, tags and Beagle's argum
 
 ## Log and console output
 
-`tests/check-log.sh` runs Java Beagle and `build/beagle` on each oracle case and compares their `<out>.log` files. It masks the timings, the start and end times, `out=` and the lines that name the program, and drops fast-beagle's `CPU time:` and `Max memory:` lines. Every other line must match. fast-beagle's standard output must also equal its log. A run that fails on a malformed reference must print one error message and end its log with it, including at `nthreads=18` on a reference where every record is malformed, so every parse worker fails at once. `CASES` restricts the cases and `NTHREADS` sets the thread count, default 2. The full gate tier runs it.
+`tests/check-log.sh <command...>` runs an implementation on each oracle case at `nthreads=2` and compares its `<out>.log` with Beagle's recorded log in `tests/logs/<case>.log`. It masks the timings, the start and end times, the data directory, `out=` and the lines that name the program, and drops fast-beagle's `CPU time:` and `Max memory:` lines. Every other line must match. For fast-beagle, standard output must also equal the log. A run that fails on a malformed reference must print one error message and end its log with it, including at `nthreads=18` on a reference where every record is malformed, so every parse worker fails at once. `CASES` restricts the cases. The gate runs it twice. `log-jar` proves the recorded logs against the jar in the full tier, and `log-c` checks `build/beagle` in both tiers. After a change to the report, rewrite the recorded logs from the jar:
+
+```bash
+RECORD=1 tests/check-log.sh java -ea -jar data/beagle.27Feb25.75f.jar
+```
 
 ## Refused inputs
 
@@ -177,7 +181,7 @@ The model represents condition-variable waits with wait sets and spurious wakeup
 
 `tests/gate-steps.sh` holds the gate's list of checks. It needs Java 21, htslib and uv. The full tier also needs `PLINK2` naming the [pinned plink2 build](#pinned-plink2-build).
 
-The script has two tiers. The full tier, the default, runs every check. `GATE_TIER=c` runs the C tier, which compares `build/beagle` against recorded results only. Java then only builds the bref3 fixtures. The C tier skips every check that runs Java or the jar next to the C binary (`jcompat`, `oracle-jar`, `failures-jar`, `java-build`, `oracle-source`, `java-trace`, `oracle-trace`, `log`, `trace`, `fuzz` and `trace-threads`), the fixture-cache check `cases`, the sanitizers and the TLA+ model check. Its `bgen` step checks the BGEN output against `tests/bgen-hashes.txt` instead of plink2 ([recorded hashes](#recorded-bgen-hashes)). It runs the saved fuzz regressions in `tests/fuzz-regressions/` as `fuzz-regressions`. It prints a `skip` line for each check it leaves out. `GATE_FUZZ=random` makes the full tier fuzz 200 new examples instead of the fixed 200.
+The script has two tiers. The full tier, the default, runs every check. `GATE_TIER=c` runs the C tier, which compares `build/beagle` against recorded results only. Java then only builds the bref3 fixtures. The C tier skips every check that runs Java or the jar next to the C binary (`jcompat`, `oracle-jar`, `failures-jar`, `java-build`, `oracle-source`, `java-trace`, `oracle-trace`, `log-jar`, `trace`, `fuzz` and `trace-threads`), the fixture-cache check `cases`, the sanitizers and the TLA+ model check. Its `bgen` step checks the BGEN output against `tests/bgen-hashes.txt` instead of plink2 ([recorded hashes](#recorded-bgen-hashes)). It runs the saved fuzz regressions in `tests/fuzz-regressions/` as `fuzz-regressions`. It prints a `skip` line for each check it leaves out. `GATE_FUZZ=random` makes the full tier fuzz 200 new examples instead of the fixed 200.
 
 `tests/check-local.sh` is the pre-merge gate. It runs the lint hooks once, then every check in `tests/gate-steps.sh` natively and on Linux x86_64 in docker. It prints one pass or fail line per check.
 

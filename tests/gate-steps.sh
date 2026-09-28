@@ -76,6 +76,7 @@ step tracker make check-tracker
 step interval make check-interval
 full_step oracle-jar tests/check-oracle.sh java -ea -jar data/beagle.27Feb25.75f.jar
 full_step failures-jar tests/check-failures.sh java -ea -jar data/beagle.27Feb25.75f.jar
+full_step log-jar tests/check-log.sh java -ea -jar data/beagle.27Feb25.75f.jar
 full_step java-build java_build
 full_step oracle-source tests/check-oracle.sh java -ea -cp build/classes main.Main
 full_step java-trace make java-trace
@@ -83,7 +84,7 @@ full_step oracle-trace oracle_trace
 step c-build make build/beagle
 step oracle-c tests/check-oracle.sh build/beagle
 step failures-c tests/check-failures.sh build/beagle
-full_step log tests/check-log.sh
+step log-c tests/check-log.sh build/beagle
 step piece-size make check-piece-size
 step bgen-unit make check-bgen-unit
 step records make check-records
