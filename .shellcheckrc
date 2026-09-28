@@ -1,0 +1,3 @@
+# Scripts source tests/cases.sh by a runtime path; follow it from the script directory.
+external-sources=true
+source-path=SCRIPTDIR

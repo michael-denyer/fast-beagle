@@ -1,0 +1,57 @@
+/* Exercise the same record construction interface as both output producers. */
+#include <stdlib.h>
+#include <string.h>
+
+#include "main/window_writer.h"
+
+int main(int argc, char **argv) {
+    if (argc != 3) return 2;
+    char *ids[] = {"D1", "H", "D2"};
+    bool diploid[] = {true, false, true};
+    samples s = {3, ids, diploid};
+    par p = {.out = argv[1], .nthreads = 1, .ap = true, .gp = true,
+        .bgen = (bgen_mode)atoi(argv[2]), .bgen_bits = 16, .bgen_chr_set = 22};
+    window_writer ww;
+    window_writer_open(&ww, &p, &s);
+    out_worker *wk = window_writer_worker_new(&ww);
+    out_rec r = {0};
+    const char *lines[] = {
+        "22\t100\tphased\tA\tC\t.\t.\t.\tGT",
+        "22\t200\timputed\tA\tC\t.\t.\t.\tGT",
+        "22\t300\tobserved\tA\tC,G\t.\t.\tEND=301\tGT",
+        "22\t400\tmono\tA\t.\t.\t.\t.\tGT",
+        "22\t500\tfive\tA\tC,G,T,AC\t.\t.\t.\tGT"
+    };
+    for (int m = 0; m < 5; ++m) {
+        marker mk;
+        marker_parse(&mk, lines[m], strlen(lines[m]));
+        out_rec_kind kind = m == 0 ? OUT_PHASED : m == 2 ? OUT_GENOTYPED : OUT_IMPUTED;
+        window_writer_rec_begin(&ww, &r, &mk, kind);
+        for (int j = 0; j < s.n; ++j) {
+            if (m == 0) {
+                window_writer_rec_gt(&r, j == 1 ? 1 : 0, 1);
+            } else {
+                float a1[5] = {1}, a2[5] = {1};
+                if (m == 1 && j == 0) {
+                    a1[0] = 0.6662f; a1[1] = 0.3338f;
+                    a2[0] = 0.1234f; a2[1] = 0.8766f;
+                } else if (m == 1 && j == 1) {
+                    a1[0] = 3; a1[1] = 1;
+                } else if (m == 2 && j < 2) {
+                    a1[0] = 0; a1[j == 0 ? 2 : 1] = 1;
+                }
+                window_writer_rec_probs(&r, a1, a2);
+                /* Both outputs must already own what they need. */
+                memset(a1, 0, sizeof a1);
+                memset(a2, 0, sizeof a2);
+            }
+        }
+        window_writer_encode(wk, &r);
+        window_writer_put(&ww, &r);
+        marker_free(&mk);
+    }
+    window_writer_rec_free(&r);
+    window_writer_worker_free(wk);
+    window_writer_close(&ww);
+    return 0;
+}

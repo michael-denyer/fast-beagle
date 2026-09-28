@@ -1,0 +1,4 @@
+# zizmor (GitHub Actions security audit) configuration, read by the
+# pre-commit hook. No ignore rules: findings are fixed, not suppressed.
+# If one ever has to be ignored, add it here with the reason.
+rules: {}

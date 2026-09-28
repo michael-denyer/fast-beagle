@@ -1,0 +1,28 @@
+# typos-cli configuration, read by the pre-commit hook. Every allowed word
+# carries its reason.
+
+[files]
+extend-exclude = [
+    # fdlibm is kept as upstream wrote it (see the Makefile).
+    "src/jcompat/fdlibm/",
+    # Vendored and upstream trees, matching .pre-commit-config.yaml.
+    "third_party/",
+    "java/src/",
+    "data/",
+    "build/",
+]
+
+[default.extend-words]
+# Genetics abbreviation for homozygous, and Beagle's own identifiers
+# (homRefField, DEFAULT_HOM_REF_FIELDS) that the C port mirrors.
+hom = "hom"
+# bgen-reader's read() keyword return_missings (tests/check_bgen_reader.py).
+missings = "missings"
+# The mismatch row of one marker in src/imp/imp_ls.c.
+mis = "mis"
+# Beagle's BlockLineReader.SENTINAL, which src/vcf/block_reader.c names.
+SENTINAL = "SENTINAL"
+
+[default.extend-identifiers]
+# The <inttypes.h> scanf macro for int32_t (tests/jcompat/search_fixture.c).
+SCNd32 = "SCNd32"

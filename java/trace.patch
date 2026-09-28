@@ -1,0 +1,969 @@
+--- a/blbutil/Trace.java
++++ b/blbutil/Trace.java
+@@ -0,0 +1,465 @@
++/* SPDX-License-Identifier: GPL-3.0-or-later */
++package blbutil;
++
++import java.io.BufferedWriter;
++import java.io.FileWriter;
++import java.io.IOException;
++import java.io.PrintWriter;
++import java.io.UncheckedIOException;
++import java.util.HashMap;
++import java.util.Map;
++import vcf.Marker;
++
++/**
++ * Trace dumps for comparing the C port with this Java source. Enabled by
++ * {@code -Dbeagle.trace=<dir>}; each seam writes {@code <dir>/<seam>.txt}.
++ * Not part of Beagle: added by beagle-c's java/trace.patch.
++ */
++public final class Trace {
++
++    private static final String DIR = System.getProperty("beagle.trace");
++    private static final Map<String, PrintWriter> WRITERS = new HashMap<>();
++
++    static {
++        if (DIR != null) {
++            Runtime.getRuntime().addShutdownHook(new Thread(Trace::closeAll));
++        }
++    }
++
++    private Trace() {
++    }
++
++    public static boolean on() {
++        return DIR != null;
++    }
++
++    public static synchronized void line(String seam, String line) {
++        PrintWriter out = WRITERS.computeIfAbsent(seam, s -> {
++            try {
++                return new PrintWriter(new BufferedWriter(new FileWriter(DIR + "/" + s + ".txt")));
++            } catch (IOException e) {
++                throw new UncheckedIOException(e);
++            }
++        });
++        out.print(line);
++        out.print('\n');
++    }
++
++    /** T1a: one input record's marker as the iterator returned it. */
++    public static void marker(String seam, Marker m) {
++        line(seam, m.chrom() + '\t' + m.pos() + '\t' + m.id() + '\t' + m.alleles()
++                + '\t' + m.nAlleles() + '\t' + m.endValue());
++    }
++
++    /** T1b: the samples of an input file, after excludesamples=. */
++    public static void samples(String seam, vcf.Samples samples) {
++        for (int s = 0, n = samples.size(); s < n; ++s) {
++            line(seam, samples.id(s) + '\t' + (samples.isDiploid(s) ? "diploid" : "haploid"));
++        }
++    }
++
++    /** T1c: a target record's class, phase flag and allele per haplotype ('.' for missing). */
++    public static void gtRec(String seam, vcf.GTRec rec) {
++        StringBuilder sb = new StringBuilder();
++        sb.append(rec.getClass().getSimpleName()).append('\t').append(rec.isPhased()).append('\t');
++        for (int h = 0, n = rec.size(); h < n; ++h) {
++            int a = rec.get(h);
++            if (h > 0) sb.append(',');
++            sb.append(a < 0 ? "." : String.valueOf(a));
++        }
++        line(seam, sb.toString());
++    }
++
++    private static final java.util.IdentityHashMap<Object, Integer> GROUPS = new java.util.IdentityHashMap<>();
++
++    /** T1d: a reference record's class, major allele and allele per haplotype. A
++     * HapRefGTRec also names its sequence group, the shared hapToSeq object, whose
++     * contents are written once as a "group" line when first seen. */
++    public static synchronized void refRec(String seam, vcf.RefGTRec rec) {
++        String group = "-";
++        String seqToAllele = "-";
++        if (rec instanceof vcf.HapRefGTRec) {
++            ints.IntArray hapToSeq = rec.map(0);
++            Integer id = GROUPS.get(hapToSeq);
++            if (id == null) {
++                id = GROUPS.size();
++                GROUPS.put(hapToSeq, id);
++                line(seam, "group\t" + id + '\t' + ints(hapToSeq));
++            }
++            group = id.toString();
++            seqToAllele = ints(rec.map(1));
++        }
++        StringBuilder sb = new StringBuilder("rec\t");
++        sb.append(rec.getClass().getSimpleName()).append('\t').append(rec.majorAllele()).append('\t')
++                .append(group).append('\t').append(seqToAllele).append('\t');
++        for (int h = 0, n = rec.size(); h < n; ++h) {
++            if (h > 0) sb.append(',');
++            sb.append(rec.get(h));
++        }
++        line(seam, sb.toString());
++    }
++
++    /** T2: a window's bounds and marker indices, with endCm as raw double bits. */
++    public static void window(String seam, vcf.Window w, double endCm, int endPos) {
++        vcf.MarkerIndices ix = w.indices();
++        line(seam, "window\t" + w.windowIndex() + '\t' + beagleutil.ChromIds.instance().id(w.chromIndex()) + '\t'
++                + w.lastWindow() + '\t' + Long.toHexString(Double.doubleToRawLongBits(endCm)) + '\t' + endPos
++                + '\t' + ix.nMarkers() + '\t' + ix.nTargMarkers() + '\t' + ix.overlapEnd() + '\t'
++                + ix.overlapStart() + '\t' + ix.prevSplice() + '\t' + ix.nextSplice() + '\t'
++                + ix.targOverlapEnd() + '\t' + ix.targOverlapStart() + '\t' + ix.prevTargSplice() + '\t'
++                + ix.nextTargSplice());
++        vcf.Markers markers = w.refGT().isPresent() ? w.refGT().get().markers() : w.targGT().markers();
++        StringBuilder sb = new StringBuilder("positions\t");
++        for (int j = 0, n = markers.size(); j < n; ++j) {
++            if (j > 0) sb.append(',');
++            sb.append(markers.marker(j).pos());
++        }
++        line(seam, sb.toString());
++        sb.setLength(0);
++        sb.append("targMarkerToMarker\t");
++        for (int j = 0, n = ix.nTargMarkers(); j < n; ++j) {
++            if (j > 0) sb.append(',');
++            sb.append(ix.targMarkerToMarker(j));
++        }
++        line(seam, sb.toString());
++    }
++
++    /** T2b: a window's fixed phasing data that depends only on the input: the
++     * marker map, rare-allele carriers, stage-1 markers, steps and interpolation
++     * weights. Floating-point values are raw bits. Carriers are "H" for a
++     * high-frequency allele, "Z" for no carriers, else sample indices. */
++    public static void fixedPhaseData(String seam, phase.FixedPhaseData fpd) {
++        vcf.MarkerMap map = fpd.map();
++        int nMarkers = map.genPos().size();
++        line(seam, "fpd\t" + fpd.window() + '\t' + nMarkers + '\t' + fpd.nHaps() + '\t'
++                + fpd.overlap() + '\t' + fpd.stage1Overlap() + '\t' + floatBits(fpd.ibsStep()));
++        StringBuilder sb = new StringBuilder();
++        for (int m = 0; m < nMarkers; ++m) {
++            sb.setLength(0);
++            sb.append("marker\t").append(m).append('\t')
++                    .append(Long.toHexString(Double.doubleToRawLongBits(map.genPos().get(m)))).append('\t')
++                    .append(floatBits(map.genDist().get(m))).append('\t')
++                    .append(fpd.prevStage1Marker(m)).append('\t')
++                    .append(floatBits(fpd.prevStage1Wt(m))).append('\t');
++            for (int a = 0, n = fpd.targGT().marker(m).nAlleles(); a < n; ++a) {
++                if (a > 0) sb.append(';');
++                ints.IntArray c = fpd.carriers(m, a);
++                if (c == vcf.Window.HIGH_FREQ_ARRAY) sb.append('H');
++                else if (c == vcf.Window.ZERO_FREQ_ARRAY) sb.append('Z');
++                else sb.append(ints(c));
++            }
++            line(seam, sb.toString());
++        }
++        line(seam, "stage1\t" + ints(fpd.stage1To2()));
++        sb.setLength(0);
++        sb.append("stage1Dist\t");
++        for (int j = 0, n = fpd.stage1Map().genDist().size(); j < n; ++j) {
++            if (j > 0) sb.append(',');
++            sb.append(floatBits(fpd.stage1Map().genDist().get(j)));
++        }
++        line(seam, sb.toString());
++        sb.setLength(0);
++        sb.append("steps\t");
++        for (int j = 0, n = fpd.stage1Steps().size(); j < n; ++j) {
++            if (j > 0) sb.append(',');
++            sb.append(fpd.stage1Steps().end(j));
++        }
++        line(seam, sb.toString());
++    }
++
++    /** T3a: a window's stage-1 minor allele frequencies (raw bits), the IBS2
++     * markers and step starts, and each target sample's final IBS2 segments as
++     * otherSample:start-inclEnd. */
++    public static void ibs2(String seam, blbutil.FloatArray maf, phase.Ibs2Markers markers,
++            phase.SampleSeg[][] sampleSegs) {
++        StringBuilder sb = new StringBuilder("maf\t");
++        for (int j = 0, n = maf.size(); j < n; ++j) {
++            if (j > 0) sb.append(',');
++            sb.append(floatBits(maf.get(j)));
++        }
++        line(seam, sb.toString());
++        sb.setLength(0);
++        sb.append("markers\t");
++        int[] used = markers.markers(0, markers.nMarkers());
++        for (int j = 0; j < used.length; ++j) {
++            if (j > 0) sb.append(',');
++            sb.append(used[j]);
++        }
++        line(seam, sb.toString());
++        line(seam, "stepStarts\t" + ints(markers.stepStarts()));
++        for (int s = 0; s < sampleSegs.length; ++s) {
++            sb.setLength(0);
++            sb.append("segs\t").append(s).append('\t');
++            for (int j = 0; j < sampleSegs[s].length; ++j) {
++                phase.SampleSeg ss = sampleSegs[s][j];
++                if (j > 0) sb.append(',');
++                sb.append(ss.sample()).append(':').append(ss.start()).append('-').append(ss.inclEnd());
++            }
++            line(seam, sb.toString());
++        }
++    }
++
++    /** T3b0: one reverse PBWT phaser's range and seed, then each marker's
++     * target alleles. */
++    public static void revPbwt(String seam, phase.RevPbwtPhaser rp, long seed) {
++        line(seam, "rev\t" + rp.start() + '\t' + rp.end() + '\t' + seed);
++        StringBuilder sb = new StringBuilder();
++        for (int m = rp.start(); m < rp.end(); ++m) {
++            sb.setLength(0);
++            sb.append(m).append('\t');
++            for (int h = 0, n = rp.targGT().nHaps(); h < n; ++h) {
++                if (h > 0) sb.append(',');
++                sb.append(rp.allele(m, h));
++            }
++            line(seam, sb.toString());
++        }
++    }
++
++    /** T3b1: each window's initial phasing state: the seed,
++     * recombination intensity, mismatch probability and LR threshold (raw
++     * bits), pRecomb per stage-1 marker, then per target sample its two
++     * haplotypes and its clusters as type ordinal:size. */
++    public static void phaseData(String seam, phase.PhaseData pd) {
++        line(seam, "pd\t" + pd.seed() + '\t' + floatBits(pd.recombIntensity()) + '\t'
++                + floatBits(pd.pMismatch()) + '\t' + floatBits(pd.lrThreshold()));
++        StringBuilder sb = new StringBuilder("pRecomb\t");
++        blbutil.FloatArray pRecomb = pd.pRecomb();
++        for (int m = 0, n = pRecomb.size(); m < n; ++m) {
++            if (m > 0) sb.append(',');
++            sb.append(floatBits(pRecomb.get(m)));
++        }
++        line(seam, sb.toString());
++        samples(seam, pd);
++    }
++
++    /** T3b: after each stage-1 iteration of each window, the iteration
++     * count, the swap rate (raw bits), the LR threshold, and each target
++     * sample's haplotypes and clusters. */
++    public static void iteration(String seam, phase.PhaseData pd, double swapRate) {
++        line(seam, "it\t" + pd.it() + '\t' + Long.toHexString(Double.doubleToRawLongBits(swapRate)) + '\t'
++                + floatBits(pd.lrThreshold()));
++        samples(seam, pd);
++    }
++
++    private static void samples(String seam, phase.PhaseData pd) {
++        StringBuilder sb = new StringBuilder();
++        phase.EstPhase est = pd.estPhase();
++        int nMarkers = est.fpd().stage1TargGT().nMarkers();
++        for (int s = 0, n = est.fpd().stage1TargGT().nSamples(); s < n; ++s) {
++            phase.SamplePhase sp = est.get(s);
++            sb.setLength(0);
++            sb.append("sample\t").append(sp.sample()).append('\t');
++            for (int m = 0; m < nMarkers; ++m) sb.append(sp.allele1(m)).append(m + 1 < nMarkers ? ',' : '\t');
++            for (int m = 0; m < nMarkers; ++m) sb.append(sp.allele2(m)).append(m + 1 < nMarkers ? ',' : '\t');
++            for (int c = 0; c < sp.nClusters(); ++c) {
++                if (c > 0) sb.append(',');
++                sb.append(sp.clustType(c).ordinal()).append(':').append(sp.clustSize(c));
++            }
++            line(seam, sb.toString());
++        }
++    }
++
++    /** T3d: each IBS neighbour search: its parameters, each step's sequence count and haplotype to
++     * sequence map, then each step's chosen haplotype per target haplotype. */
++    public static void phaseIbs(String seam, int it, boolean useBwd, phase.PbwtIbsData data,
++            phase.CodedSteps codedSteps, ints.WrappedIntArray[] ibsHaps) {
++        line(seam, "ibs\t" + it + '\t' + useBwd + '\t' + data.nCandidates() + '\t'
++                + data.stepsPerBatch() + '\t' + data.nOverlapSteps());
++        StringBuilder sb = new StringBuilder();
++        for (int j = 0, n = codedSteps.steps().size(); j < n; ++j) {
++            ints.IndexArray ia = codedSteps.get(j);
++            sb.setLength(0);
++            sb.append("code\t").append(j).append('\t').append(ia.valueSize()).append('\t');
++            for (int h = 0, nh = ia.size(); h < nh; ++h) {
++                if (h > 0) sb.append(',');
++                sb.append(ia.get(h));
++            }
++            line(seam, sb.toString());
++        }
++        for (int j = 0; j < ibsHaps.length; ++j) {
++            line(seam, "ibsHaps\t" + j + '\t' + ints(ibsHaps[j]));
++        }
++    }
++
++    /** T4a: each window's stage-2 IBS neighbours, forward then
++     * backward, per stage-1 step and target haplotype. */
++    public static void lowFreqIbs(String seam, phase.LowFreqPhaseIbs ibs) {
++        phase.FixedPhaseData fpd = ibs.phaseData().fpd();
++        int nSteps = fpd.stage1Steps().size();
++        int nTargHaps = fpd.targGT().nHaps();
++        line(seam, "stage2\t" + ibs.phaseData().it());
++        StringBuilder sb = new StringBuilder();
++        for (int dir = 0; dir < 2; ++dir) {
++            for (int j = 0; j < nSteps; ++j) {
++                sb.setLength(0);
++                sb.append(dir == 0 ? "fwd" : "bwd").append('\t').append(j).append('\t');
++                for (int h = 0; h < nTargHaps; ++h) {
++                    if (h > 0) sb.append(',');
++                    sb.append(dir == 0 ? ibs.fwdIbsHap(h, j) : ibs.bwdIbsHap(h, j));
++                }
++                line(seam, sb.toString());
++            }
++        }
++    }
++
++    private static final java.util.concurrent.ConcurrentSkipListMap<Integer, String> STAGE2_DIGESTS
++            = new java.util.concurrent.ConcurrentSkipListMap<>();
++
++    /** T4b: an FNV-1a digest over 32-bit words of one target haplotype's
++     * stage-2 HMM states and state probabilities (raw bits) at every stage-1
++     * marker. Stored until the stage-2 threads finish, then written in
++     * haplotype order. */
++    public static void stage2Digest(int hap, int nStates, int[][] states, float[][] probs) {
++        long h = 0xcbf29ce484222325L;
++        for (int m = 0; m < states.length; ++m) {
++            for (int j = 0; j < nStates; ++j) {
++                h = (h ^ (states[m][j] & 0xffffffffL)) * 0x100000001b3L;
++                h = (h ^ (Float.floatToRawIntBits(probs[m][j]) & 0xffffffffL)) * 0x100000001b3L;
++            }
++        }
++        STAGE2_DIGESTS.put(hap, "hap\t" + hap + '\t' + nStates + '\t' + Long.toHexString(h));
++    }
++
++    public static void flushStage2Digests(String seam) {
++        for (String s : STAGE2_DIGESTS.values()) {
++            line(seam, s);
++        }
++        STAGE2_DIGESTS.clear();
++    }
++
++    private static final java.util.concurrent.ConcurrentSkipListMap<Integer, String> STAGE2_DECISIONS
++            = new java.util.concurrent.ConcurrentSkipListMap<Integer, String>();
++
++    /** T4d: an FNV-1a digest of one target sample's stage-2 allele
++     * probabilities: for each heterozygote the two phase probabilities, and
++     * for each missing genotype both haplotypes' allele probabilities, with
++     * the marker index. Written in sample order when the threads finish. */
++    public static void stage2Decisions(int sample, long digest) {
++        STAGE2_DECISIONS.put(sample, "sample\t" + sample + '\t' + Long.toHexString(digest));
++    }
++
++    public static void flushStage2Decisions(String seam) {
++        for (String s : STAGE2_DECISIONS.values()) {
++            line(seam, s);
++        }
++        STAGE2_DECISIONS.clear();
++    }
++
++    /** T5a: a window's imputation data: cluster count, haplotype counts and
++     * mismatch rate, then per cluster its target and reference marker range,
++     * mean cM position, mismatch and switch probabilities (raw bits), sequence
++     * count and an FNV-1a digest of its haplotype-to-sequence map, then a
++     * digest of the reference markers' interpolation weights. */
++    public static void impData(String seam, imp.ImpData id, int window, float errRate) {
++        line(seam, "imp\t" + window + '\t' + id.nClusters() + '\t' + id.nRefHaps() + '\t' + id.nTargHaps()
++                + '\t' + id.nInputTargHaps() + '\t' + floatBits(errRate));
++        for (int c = 0; c < id.nClusters(); ++c) {
++            long h = 0xcbf29ce484222325L;
++            for (int hap = 0; hap < id.nHaps(); ++hap) {
++                h = (h ^ (id.allele(c, hap) & 0xffffffffL)) * 0x100000001b3L;
++            }
++            line(seam, "c\t" + c + '\t' + id.targClusterStart(c) + '\t' + id.targClusterEnd(c) + '\t'
++                    + id.refClusterStart(c) + '\t' + id.refClusterEnd(c) + '\t'
++                    + Long.toHexString(Double.doubleToRawLongBits(id.pos(c))) + '\t'
++                    + floatBits(id.errProb(c)) + '\t' + floatBits(id.pRecomb(c)) + '\t'
++                    + id.hapToSeq(c).valueSize() + '\t' + Long.toHexString(h));
++        }
++        long h = 0xcbf29ce484222325L;
++        for (int m = 0, n = id.refGT().nMarkers(); m < n; ++m) {
++            h = (h ^ (Float.floatToRawIntBits((float) id.weight(m)) & 0xffffffffL)) * 0x100000001b3L;
++        }
++        line(seam, "weight\t" + Long.toHexString(h));
++    }
++
++    /** T5b: the imputation steps (first cluster, sequence count and an
++     * FNV-1a digest of each step's haplotype-to-sequence map), then each
++     * step's IBS reference haplotypes per target haplotype. */
++    public static void impIbs(String seam, imp.ImpIbs ibs, int nTargHaps) {
++        imp.CodedSteps cs = ibs.codedSteps();
++        StringBuilder sb = new StringBuilder("steps");
++        for (int j = 0; j < cs.nSteps(); ++j) {
++            ints.IndexArray ia = cs.get(j);
++            long h = 0xcbf29ce484222325L;
++            for (int hap = 0, n = ia.size(); hap < n; ++hap) {
++                h = (h ^ (ia.get(hap) & 0xffffffffL)) * 0x100000001b3L;
++            }
++            sb.append('\t').append(cs.stepStart(j)).append(':').append(ia.valueSize()).append(':')
++                    .append(Long.toHexString(h));
++        }
++        line(seam, sb.toString());
++        for (int j = 0; j < cs.nSteps(); ++j) {
++            for (int t = 0; t < nTargHaps; ++t) {
++                int[] haps = ibs.ibsHaps(t, j);
++                sb.setLength(0);
++                sb.append("ibs\t").append(j).append('\t').append(t).append('\t');
++                for (int k = 0; k < haps.length; ++k) {
++                    if (k > 0) sb.append(',');
++                    sb.append(haps[k]);
++                }
++                line(seam, sb.toString());
++            }
++        }
++    }
++
++    private static final java.util.concurrent.ConcurrentSkipListMap<Integer, String> IMP_STATE_PROBS
++            = new java.util.concurrent.ConcurrentSkipListMap<Integer, String>();
++
++    /** T5c: per target haplotype, its number of imputation states, an FNV-1a
++     * digest of the states' reference haplotypes and allele matches at every
++     * cluster, and a digest of the kept state probabilities (raw bits).
++     * Written in haplotype order when the imputation threads finish. */
++    public static void impStateProbs(int hap, int nStates, long statesDigest, imp.StateProbs sp) {
++        long h = 0xcbf29ce484222325L;
++        for (int m = 0, n = sp.nTargMarkers(); m < n; ++m) {
++            int k = sp.nStates(m);
++            h = (h ^ (k & 0xffffffffL)) * 0x100000001b3L;
++            for (int j = 0; j < k; ++j) {
++                h = (h ^ (sp.refHap(m, j) & 0xffffffffL)) * 0x100000001b3L;
++                h = (h ^ (Float.floatToRawIntBits(sp.probs(m, j)) & 0xffffffffL)) * 0x100000001b3L;
++                h = (h ^ (Float.floatToRawIntBits(sp.probsP1(m, j)) & 0xffffffffL)) * 0x100000001b3L;
++            }
++        }
++        IMP_STATE_PROBS.put(hap, "hap\t" + hap + '\t' + nStates + '\t' + Long.toHexString(statesDigest) + '\t'
++                + Long.toHexString(h));
++    }
++
++    public static void flushImpStateProbs(String seam) {
++        for (String s : IMP_STATE_PROBS.values()) {
++            line(seam, s);
++        }
++        IMP_STATE_PROBS.clear();
++    }
++
++    private static final java.util.concurrent.ConcurrentSkipListMap<Integer, String> IMP_RECS
++            = new java.util.concurrent.ConcurrentSkipListMap<Integer, String>();
++
++    /** T5d: a cluster's imputed records, stored until the window's clusters
++     * are all written, then written in cluster order. */
++    public static void impRecs(int cluster, String lines) {
++        IMP_RECS.put(cluster, lines);
++    }
++
++    public static void flushImpRecs(String seam) {
++        for (String s : IMP_RECS.values()) {
++            line(seam, s);
++        }
++        IMP_RECS.clear();
++    }
++
++    private static String floatBits(float f) {
++        return Integer.toHexString(Float.floatToRawIntBits(f));
++    }
++
++    private static String ints(ints.IntArray a) {
++        StringBuilder sb = new StringBuilder();
++        for (int j = 0, n = a.size(); j < n; ++j) {
++            if (j > 0) sb.append(',');
++            sb.append(a.get(j));
++        }
++        return sb.toString();
++    }
++
++    private static synchronized void closeAll() {
++        WRITERS.values().forEach(PrintWriter::close);
++    }
++}
+--- a/bref/Bref3It.java
++++ b/bref/Bref3It.java
+@@ -89,6 +89,7 @@
+         this.brefFile = brefFile;
+         this.dataIn = new DataInputStream(dis);
+         this.bref3Reader = new Bref3Reader(brefFile, dataIn, sampleFilter, markerFilter);
++        if (blbutil.Trace.on()) blbutil.Trace.samples("T1b-ref", bref3Reader.samples());
+         this.buffer = new ArrayDeque<>(500);
+         bref3Reader.readBlock(dataIn, buffer);
+     }
+@@ -114,6 +115,10 @@
+             throw new NoSuchElementException();
+         }
+         RefGTRec rec = buffer.removeFirst();
++        if (blbutil.Trace.on()) {
++            blbutil.Trace.marker("T1a-ref", rec.marker());
++            blbutil.Trace.refRec("T1d-ref", rec);
++        }
+         if (buffer.isEmpty()) {
+             bref3Reader.readBlock(dataIn, buffer);
+         }
+--- a/imp/ImpData.java
++++ b/imp/ImpData.java
+@@ -116,6 +116,9 @@
+         this.errProb = err(par.err(nHaps), targClustStartEnd);
+         this.pRecomb = pRecomb(par.ne(), refGT.nHaps(), pos);
+         this.weight = wts(refGT.markers(), refClusterStart, refClusterEnd, map);
++        if (blbutil.Trace.on()) {
++            blbutil.Trace.impData("T5a", this, window.windowIndex(), par.err(nHaps));
++        }
+     }
+ 
+     private static double[] cumPos(Markers markers, GeneticMap map) {
+--- a/imp/ImpLS.java
++++ b/imp/ImpLS.java
+@@ -57,6 +57,9 @@
+         final AtomicInteger hapIndices = new AtomicInteger(0);
+         ExecutorService es = Executors.newFixedThreadPool(nThreads);
+         ImpIbs ibsHaps = new ImpIbs(impData);
++        if (blbutil.Trace.on()) {
++            blbutil.Trace.impIbs("T5b", ibsHaps, nTargHaps);
++        }
+         try {
+             for (int j=0; j<nThreads; ++j) {
+                 ImpLSBaum baum = new ImpLSBaum(impData, ibsHaps);
+@@ -76,6 +79,9 @@
+             }
+             es.shutdown();
+             es.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
++            if (blbutil.Trace.on()) {
++                blbutil.Trace.flushImpStateProbs("T5c");
++            }
+         }
+         catch (Throwable t) {
+             Utilities.exit(t);
+--- a/imp/ImpLSBaum.java
++++ b/imp/ImpLSBaum.java
+@@ -80,13 +80,27 @@
+     public StateProbs impute(int targHap) {
+         int lastMarker = impData.nClusters() - 1;
+         int nStates = states.ibsStates(targHap, hapIndices, allelesMatch);
++        long statesDigest = 0L;
++        if (blbutil.Trace.on()) {
++            statesDigest = 0xcbf29ce484222325L;
++            for (int m = 0; m < nMarkers; ++m) {
++                for (int j = 0; j < nStates; ++j) {
++                    statesDigest = (statesDigest ^ (hapIndices[m][j] & 0xffffffffL)) * 0x100000001b3L;
++                    statesDigest = (statesDigest ^ (allelesMatch[m][j] ? 1L : 0L)) * 0x100000001b3L;
++                }
++            }
++        }
+         setFwdValues(targHap, nStates);
+         Arrays.fill(bwdVal, 0, nStates, 1.0f/nStates);
+         float lastSum = 1.0f;
+         for (int m=lastMarker; m>=0; --m) {
+             lastSum = setBwdValue(m, nStates, lastSum);
+         }
+-        return alProbsFactory.stateProbs(targHap, nStates, hapIndices, fwdVal);
++        StateProbs sp = alProbsFactory.stateProbs(targHap, nStates, hapIndices, fwdVal);
++        if (blbutil.Trace.on()) {
++            blbutil.Trace.impStateProbs(targHap, nStates, statesDigest, sp);
++        }
++        return sp;
+     }
+ 
+     /**
+--- a/imp/ImputedRecBuilder.java
++++ b/imp/ImputedRecBuilder.java
+@@ -62,7 +62,26 @@
+     private final StringBuilder sampleData;
+ 
+     private int hapCnt;
++    private long digest = 0xcbf29ce484222325L;   // trace seam T5d
+ 
++    private void fold(float[] fa) {
++        for (float f : fa) {
++            digest = (digest ^ (Float.floatToRawIntBits(f) & 0xffffffffL)) * 0x100000001b3L;
++        }
++    }
++
++    /** T5d: the digest of the samples' raw allele probabilities, then per ALT
++     * allele the dose sums and DR2 as raw bits. */
++    String traceFields() {
++        StringBuilder sb = new StringBuilder(Long.toHexString(digest));
++        for (int a = 1; a < nAlleles; ++a) {
++            sb.append('\t').append(Integer.toHexString(Float.floatToRawIntBits(sumAlProbs[a]))).append(':')
++                    .append(Integer.toHexString(Float.floatToRawIntBits(sumAlProbs2[a]))).append(':')
++                    .append(Integer.toHexString(Float.floatToRawIntBits(r2(a))));
++        }
++        return sb.toString();
++    }
++
+     /**
+      * Constructs a new {@code ImputedRecBuilder} instance for the specified
+      * number of samples.
+@@ -136,6 +155,10 @@
+      */
+     public void addSampleData(float[] a1, float[] a2) {
+         hapCnt+=2;
++        if (blbutil.Trace.on()) {
++            fold(a1);
++            fold(a2);
++        }
+         if (a1[0]==1.0f && a2[0]==1.0f && a1.length < DEFAULT_HOM_REF_FIELDS.length) {
+             sampleData.append(homRefField[a1.length]);
+         }
+@@ -193,6 +216,9 @@
+      */
+     public void addSampleData(float[] a1) {
+         ++hapCnt;
++        if (blbutil.Trace.on()) {
++            fold(a1);
++        }
+         scale(a1);
+         sampleData.append(Const.tab);
+         sampleData.append(maxIndex(a1));
+--- a/imp/ImputedVcfWriter.java
++++ b/imp/ImputedVcfWriter.java
+@@ -141,6 +141,15 @@
+                 }
+             }
+         }
++        if (blbutil.Trace.on()) {
++            StringBuilder sb = new StringBuilder();
++            for (int m=0; m<a1Probs.length; ++m) {
++                if (m > 0) sb.append('\n');
++                sb.append("rec\t").append(targCluster).append('\t').append(refStart + m).append('\t')
++                        .append(recBuilders[m].traceFields());
++            }
++            blbutil.Trace.impRecs(targCluster, sb.toString());
++        }
+         for (int m=0; m<a1Probs.length; ++m) {
+             recBuilders[m].printRec(out, isImputed[m]);
+         }
+--- a/main/Main.java
++++ b/main/Main.java
+@@ -175,6 +175,9 @@
+             runStats.printStage1Info(pd, (System.nanoTime() - t0));
+             pd.incrementIt();
+             double swapRate = SwapRate.getAndResetSwapRate();
++            if (blbutil.Trace.on()) {
++                blbutil.Trace.iteration("T3b", pd, swapRate);
++            }
+             if (pd.it()<par.burnin() && swapRate<=maxBurninSwapRate) {
+                 pd.advanceToFirstPhasingIt();
+             }
+--- a/main/WindowWriter.java
++++ b/main/WindowWriter.java
+@@ -138,6 +138,9 @@
+                 .mapToObj(c -> toByteArray(impData, start, end, stateProbs, c))
+                 .toArray(UnsignedByteArray[]::new);
+         append(output, vcfOutFile);
++        if (blbutil.Trace.on()) {
++            blbutil.Trace.flushImpRecs("T5d");
++        }
+     }
+ 
+     private static UnsignedByteArray toByteArray(ImpData impData,
+--- a/phase/FixedPhaseData.java
++++ b/phase/FixedPhaseData.java
+@@ -163,6 +163,9 @@
+         int maxMafHaps = 10000;
+         this.stage1Maf = maf(stage1RefGT, stage1TargGT, maxMafHaps, par.seed());
+         this.stage1Ibs2 = new Ibs2(stage1TargGT, stage1Map, stage1Maf);
++        if (blbutil.Trace.on()) {
++            blbutil.Trace.fixedPhaseData("T2b", this);
++        }
+     }
+ 
+     private static MarkerMap markerMap(GeneticMap genMap, Markers markers) {
+--- a/phase/Ibs2.java
++++ b/phase/Ibs2.java
+@@ -69,6 +69,9 @@
+                 .parallel()
+                 .mapToObj(s -> ibs2Segments(targGT, genPos, ibs2Sets, s))
+                 .toArray(SampleSeg[][]::new);
++        if (blbutil.Trace.on()) {
++            blbutil.Trace.ibs2("T3a", maf, ibs2Markers, sampleSegs);
++        }
+     }
+ 
+     private static SampleSeg[] ibs2Segments(GT targGT,  DoubleArray genPos,
+--- a/phase/LowFreqPhaseIbs.java
++++ b/phase/LowFreqPhaseIbs.java
+@@ -52,6 +52,9 @@
+         this.allHaps = codedSteps.allHaps();
+         this.fwdPhaseIbs = new LowFreqPbwtPhaseIbs(phaseData, codedSteps, false);
+         this.bwdPhaseIbs = new LowFreqPbwtPhaseIbs(phaseData, codedSteps, true);
++        if (blbutil.Trace.on()) {
++            blbutil.Trace.lowFreqIbs("T4a", this);
++        }
+     }
+ 
+     /**
+--- a/phase/ParamEstimates.java
++++ b/phase/ParamEstimates.java
+@@ -117,6 +117,28 @@
+      * {@code this.addMismatchData} and {@code this.addSwitchData()}
+      * methods.
+      */
++    /** T3c: the per-sample mismatch data (count:sum) and switch data
++     * (distance:switch probability) in the order they are summed, as raw bits. */
++    void trace(String seam) {
++        StringBuilder sb = new StringBuilder("mismatch\t");
++        MismatchData[] mda = mismatchData.stream().sorted().toArray(MismatchData[]::new);
++        for (int j = 0; j < mda.length; ++j) {
++            if (j > 0) sb.append(',');
++            sb.append(mda[j].markerCnt).append(':')
++                    .append(Long.toHexString(Double.doubleToRawLongBits(mda[j].pMismatchSum)));
++        }
++        blbutil.Trace.line(seam, sb.toString());
++        sb.setLength(0);
++        sb.append("switch\t");
++        RecombData[] rda = switchData.stream().sorted().toArray(RecombData[]::new);
++        for (int j = 0; j < rda.length; ++j) {
++            if (j > 0) sb.append(',');
++            sb.append(Long.toHexString(Double.doubleToRawLongBits(rda[j].genDistance))).append(':')
++                    .append(Long.toHexString(Double.doubleToRawLongBits(rda[j].switchProb)));
++        }
++        blbutil.Trace.line(seam, sb.toString());
++    }
++
+     public void clear() {
+         switchData.clear();
+         mismatchData.clear();
+--- a/phase/PbwtPhaseIbs.java
++++ b/phase/PbwtPhaseIbs.java
+@@ -81,6 +81,10 @@
+                     .flatMap(a -> Arrays.stream(a))
+                     .toArray(WrappedIntArray[]::new);
+         }
++        if (blbutil.Trace.on()) {
++            blbutil.Trace.phaseIbs("T3d-" + phaseData.it() + (useBwd ? "-bwd" : "-fwd"), phaseData.it(), useBwd, data,
++                    codedSteps, ibsHaps);
++        }
+     }
+ 
+     private static void checkConsistency(PhaseData phaseData,
+--- a/phase/PhaseData.java
++++ b/phase/PhaseData.java
+@@ -59,6 +59,9 @@
+         float recombIntensity = (float) 0.04f*fpd.par().ne()/fpd.nHaps();
+         this.trProb = new TrProb(fpd.stage1Map(), recombIntensity);
+         this.pMismatch = Par.liStephensPMismatch(fpd.nHaps());
++        if (blbutil.Trace.on()) {
++            blbutil.Trace.phaseData("T3b1", this);
++        }
+     }
+ 
+     static float lrThreshold(Par par, int it) {
+--- a/phase/PhaseLS.java
++++ b/phase/PhaseLS.java
+@@ -53,6 +53,10 @@
+         int nSamples = pd.fpd().targGT().nSamples();
+         int nBurninIts = par.burnin();
+         PbwtPhaseIbs phaseIbs = pbwtPhaseIbs(pd);
++        if (blbutil.Trace.on() && it == 0) {
++            // trace only: the forward search, which Beagle first runs at iteration 1
++            new PbwtPhaseIbs(pd, pd.codedSteps(), false);
++        }
+         if (par.em()) {
+             Random rand = new Random(pd.seed());
+             if (it==0) {
+@@ -113,6 +117,14 @@
+         if (Float.isFinite(recombIntensity) && recombIntensity>0f) {
+             pd.updateRecombIntensity(recombIntensity);
+         }
++        if (blbutil.Trace.on()) {
++            paramEst.trace("T3c");
++            blbutil.Trace.line("T3c", "params\t" + pd.it() + '\t'
++                    + Integer.toHexString(Float.floatToRawIntBits(pMismatch)) + '\t'
++                    + Integer.toHexString(Float.floatToRawIntBits(recombIntensity)) + '\t'
++                    + Integer.toHexString(Float.floatToRawIntBits(pd.pMismatch())) + '\t'
++                    + Integer.toHexString(Float.floatToRawIntBits(pd.recombIntensity())));
++        }
+     }
+ 
+     private static ParamEstimates getParamEst(PbwtPhaseIbs phaseIbs, Random rand) {
+@@ -190,6 +202,11 @@
+             } );
+         }
+         MultiThreadUtils.shutdownExecService(es);
++        if (blbutil.Trace.on()) {
++            blbutil.Trace.flushStage2Digests("T4b");
++            blbutil.Trace.flushStage2Decisions("T4d");
++            stage2Haps.trace("T4c");
++        }
+         return stage2Haps;
+     }
+ }
+--- a/phase/RevPbwtPhaser.java
++++ b/phase/RevPbwtPhaser.java
+@@ -73,6 +73,9 @@
+                 .map(m -> targGT.markers().marker(m).bitsPerAllele())
+                 .toArray();
+         this.markerToBits = phase(fpd, start, end, seed);
++        if (blbutil.Trace.on()) {
++            blbutil.Trace.revPbwt("T3b0-" + start, this, seed);
++        }
+     }
+ 
+     private static BitArray[] phase(FixedPhaseData fpd, int start, int end,
+--- a/phase/Stage2Baum.java
++++ b/phase/Stage2Baum.java
+@@ -50,6 +50,7 @@
+     private final Stage2Haps stage2Haps;
+     private final IntArray stage1To2;
+     private final Random rand;
++    private long decisions;   // trace seam T4d
+ 
+     /**
+      * Creates a {@code ImputeBaum} instance from the specified data.
+@@ -95,6 +96,11 @@
+         int h2 = h1 | 0b1;
+         nStates[0] = stateProbs.run(h1, states[0], probs[0]);
+         nStates[1] = stateProbs.run(h2, states[1], probs[1]);
++        if (blbutil.Trace.on()) {
++            blbutil.Trace.stage2Digest(h1, nStates[0], states[0], probs[0]);
++            blbutil.Trace.stage2Digest(h2, nStates[1], states[1], probs[1]);
++        }
++        decisions = 0xcbf29ce484222325L;
+ 
+         int start = 0;
+         for (int j=0; j<nStage1Markers; ++j) {
+@@ -103,8 +109,15 @@
+             start = end + 1;
+         }
+         imputeInterval(targSample, start, unphTargGT.nMarkers());
++        if (blbutil.Trace.on()) {
++            blbutil.Trace.stage2Decisions(targSample, decisions);
++        }
+     }
+ 
++    private void fold(int v) {
++        decisions = (decisions ^ (v & 0xffffffffL)) * 0x100000001b3L;
++    }
++
+     private void imputeInterval(int sample, int start, int end) {
+         int hap1 = sample << 1;
+         int hap2 = hap1 | 0b1;
+@@ -117,6 +130,9 @@
+                     float[] alProbs2 = unscaledAlProbs(m, 1, a1, a2);
+                     float p1 = alProbs1[a1]*alProbs2[a2];
+                     float p2 = alProbs1[a2]*alProbs2[a1];
++                    fold(m);
++                    fold(Float.floatToRawIntBits(p1));
++                    fold(Float.floatToRawIntBits(p2));
+                     boolean switchAlleles = (p1<p2 || (p1==p2 && rand.nextBoolean()));
+                     if (switchAlleles) {
+                         int tmp = a1;
+@@ -126,6 +142,7 @@
+                 }
+             }
+             else {
++                fold(m);
+                 a1 = imputeAllele(m, 0);
+                 a2 = imputeAllele(m, 1);
+             }
+@@ -205,6 +222,9 @@
+                     }
+                 }
+             }
++        }
++        for (float p : alProbs) {
++            fold(Float.floatToRawIntBits(p));
+         }
+         return maxIndex(alProbs);
+     }
+--- a/phase/Stage2Haps.java
++++ b/phase/Stage2Haps.java
+@@ -92,6 +92,48 @@
+      * Returns the input data for phasing that is the same in each iteration.
+      * @return the input data for phasing that is the same in each iteration
+      */
++    /** T4c: at each stage-2 marker, the haplotypes carrying each allele,
++     * "M" for the major allele that stage2Rec leaves implicit. */
++    void trace(String seam) {
++        StringBuilder sb = new StringBuilder();
++        for (int m = 0, n = markers.size(); m < n; ++m) {
++            int m1 = fpd.prevStage1Marker(m);
++            if (fpd.stage1To2().get(m1) == m) {
++                continue;
++            }
++            int alStart = markers.sumAlleles(m);
++            int alEnd = markers.sumAlleles(m + 1);
++            int[][] hapIndices = new int[alEnd - alStart][];
++            int majorAllele = -1;
++            for (int j = 0; j < hapIndices.length; ++j) {
++                SynchedIntList list = rareCarriers.get(alStart + j);
++                if (list != null) {
++                    hapIndices[j] = list.toArray();
++                    Arrays.sort(hapIndices[j]);
++                } else {
++                    majorAllele = j;
++                }
++            }
++            if (majorAllele == -1) {
++                setMajorAlleleToNull(hapIndices);
++            }
++            sb.setLength(0);
++            sb.append("m\t").append(m);
++            for (int j = 0; j < hapIndices.length; ++j) {
++                sb.append('\t');
++                if (hapIndices[j] == null) {
++                    sb.append('M');
++                    continue;
++                }
++                for (int k = 0; k < hapIndices[j].length; ++k) {
++                    if (k > 0) sb.append(',');
++                    sb.append(hapIndices[j][k]);
++                }
++            }
++            blbutil.Trace.line(seam, sb.toString());
++        }
++    }
++
+     public FixedPhaseData fpd() {
+         return fpd;
+     }
+--- a/vcf/RefIt.java
++++ b/vcf/RefIt.java
+@@ -132,6 +132,7 @@
+         boolean storeId = true;
+         MarkerParser filter = new MarkerParser(storeId, false, false, false);
+         this.vcfHeader = new VcfHeader(src, nonDataLines, isDiploid, sampleFilter);
++        if (blbutil.Trace.on()) blbutil.Trace.samples("T1b-ref", vcfHeader.samples());
+         this.mapper = (String s) -> {
+             return RefGTRec.alleleRefGTRec(new VcfRecGTParser(vcfHeader, s, filter));
+         } ;
+@@ -261,6 +262,10 @@
+             throw new NoSuchElementException();
+         }
+         RefGTRec first = recBuffer.removeFirst();
++        if (blbutil.Trace.on()) {
++            blbutil.Trace.marker("T1a-ref", first.marker());
++            blbutil.Trace.refRec("T1d-ref", first);
++        }
+         if (recBuffer.isEmpty()) {
+             fillRecBuffer();
+         }
+--- a/vcf/RefTargSlidingWindow.java
++++ b/vcf/RefTargSlidingWindow.java
+@@ -251,6 +251,7 @@
+                     double endCm = nextEndCm(nextRefRec.marker());
+                     int endPos = genMap.basePos(chromIndex, endCm);
+                     Window window = readWindow(chromIndex, endPos, ++windowIndex);
++                    if (blbutil.Trace.on()) blbutil.Trace.window("T2", window, endCm, endPos);
+                     SlidingWindow.addToQ(q, window);
+                     int targOverlapStart = window.indices().targOverlapStart();
+                     int refOverlapStart = window.indices().overlapStart();
+--- a/vcf/TargSlidingWindow.java
++++ b/vcf/TargSlidingWindow.java
+@@ -195,6 +195,7 @@
+                     double nextEndCm = nextEndCm(nextRec.marker());
+                     int endPos = genMap.basePos(chromIndex, nextEndCm);
+                     Window window = readWindow(chromIndex, endPos, ++windowIndex);
++                    if (blbutil.Trace.on()) blbutil.Trace.window("T2", window, nextEndCm, endPos);
+                     SlidingWindow.addToQ(q, window);
+                     int overlapStart = window.indices().overlapStart();
+                     overlap.addAll(recs.subList(overlapStart, recs.size()));
+--- a/vcf/VcfIt.java
++++ b/vcf/VcfIt.java
+@@ -218,6 +218,7 @@
+         MarkerParser fieldFilter = new MarkerParser(storeId, false, false, false);
+         this.it = it;
+         this.vcfHeader = new VcfHeader(src, nonDataLines, isDiploid, sampleFilter);
++        if (blbutil.Trace.on()) blbutil.Trace.samples("T1b-target", vcfHeader.samples());
+         this.mapper = (String s) -> recMapper.apply(vcfHeader, s, fieldFilter);
+         this.next = firstDataLine;
+         this.markerFilter = markerFilter;
+@@ -303,6 +304,10 @@
+             throw new NoSuchElementException();
+         }
+         E first = recBuffer.removeFirst();
++        if (blbutil.Trace.on()) {
++            blbutil.Trace.marker("T1a-target", first.marker());
++            blbutil.Trace.gtRec("T1c-target", first);
++        }
+         if (recBuffer.isEmpty()) {
+             fillEmissionBuffer();
+         }

@@ -1,0 +1,13 @@
+{
+  // markdownlint-cli2 configuration, read by the pre-commit hook.
+  "config": {
+    // Prose is one line per paragraph; hard-wrapping adds diff noise.
+    "MD013": false,
+    // Tables mix aligned and compact pipes; re-aligning a whole table when
+    // one cell grows makes diffs noisy.
+    "MD060": false,
+    // Markdown has no syntax for a sized, centred image.
+    "MD033": { "allowed_elements": ["img", "p"] }
+  },
+  "ignores": ["third_party/**", "java/src/**", "data/**", "build/**"]
+}

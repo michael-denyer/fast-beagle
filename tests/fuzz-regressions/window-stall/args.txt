@@ -1,0 +1,1 @@
+seed=310 nthreads=1 phase-states=29 window=0.5 overlap=0.3 impute=false cluster=0.001 gp=true

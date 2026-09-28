@@ -1,0 +1,96 @@
+#!/bin/bash
+# Builds build/beagle and the BGEN unit tests under AddressSanitizer and
+# UndefinedBehaviorSanitizer, in build/san so the normal build is untouched,
+# then runs every oracle case as VCF only, with bgen=plink2 and with
+# bgen=phased. Every run must exit 0 with the oracle hash and no sanitizer
+# report. On Linux LeakSanitizer also runs; it does not support macOS arm64.
+# On macOS it then builds build/beagle under ThreadSanitizer in build/tsan and
+# runs every oracle case at 18 threads, and the thread-dependent cases again
+# with trace= (parallel_for workers write trace seams). ThreadSanitizer cannot
+# start in the gate's docker leg: it needs an address layout that the x86_64
+# emulation gives only with ASLR off, and docker forbids turning ASLR off.
+# Runs that end in util_exit are not tested: exit leaves memory allocated by
+# design.
+#
+# Usage: tests/check-sanitizers.sh
+# NTHREADS overrides the thread counts tried (default "1 2").
+# CASES restricts the run to the named cases (default all).
+set -uo pipefail
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+# shellcheck source=cases.sh
+source "$ROOT/tests/cases.sh"
+SAN="$ROOT/build/san"
+
+mkdir -p "$SAN"
+rsync -a --delete --exclude build "$ROOT/Makefile" "$ROOT/java" "$ROOT/src" "$ROOT/third_party" "$ROOT/tests" "$SAN/"
+SAN_CFLAGS=${SAN_CFLAGS:-"-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all"}
+# make does not rebuild objects when only CFLAGS change.
+make -C "$SAN" clean > /dev/null
+make -C "$SAN" CFLAGS="$SAN_CFLAGS" build/beagle check-bgen-unit check-records check-tracker \
+  > "$SAN/make.log" 2>&1 || { echo "FAIL sanitizer build or BGEN unit test ($SAN/make.log)"; exit 1; }
+echo "PASS sanitizer build and BGEN unit tests"
+
+leaks=0
+[ "$(uname -s)" = Linux ] && leaks=1
+# Reports go to the run's stderr, which is kept in its log.
+export ASAN_OPTIONS="detect_leaks=$leaks"
+export UBSAN_OPTIONS="print_stacktrace=1"
+REPORT='runtime error:|ERROR: (Address|Leak|UndefinedBehavior)Sanitizer'
+OUT=$(mktemp -d)
+trap 'rm -rf "$OUT"' EXIT
+
+check_selection "$ROOT/tests/oracle-cases.txt" || exit 1
+fail=0
+while read -r name expect tags args; do
+  selected "$name" || continue
+  for t in ${NTHREADS:-1 2}; do
+    for mode in vcf plink2 phased; do
+      [ "$mode" = plink2 ] && has_tag "$tags" nonautosome && continue
+      bgen=()
+      [ "$mode" = vcf ] || bgen=(bgen="$mode")
+      out="$OUT/$name.t$t.$mode"
+      case_verdict "$expect" "$args" "$out" "$t" "$SAN/build/beagle" ${bgen[@]+"${bgen[@]}"}
+      ok=$?
+      if grep -Eq "$REPORT" "$out.log"; then
+        echo "FAIL $name nthreads=$t $mode: sanitizer report"; grep -E -A12 "$REPORT" "$out.log" | head -40; fail=1
+      elif [ $ok -eq 0 ]; then
+        echo "PASS $name nthreads=$t $mode"
+      else
+        echo "FAIL $name nthreads=$t $mode $VERDICT"; tail -5 "$out.log"; fail=1
+      fi
+    done
+  done
+done < <(cases)
+
+[ $leaks -eq 1 ] && echo "leak checking on" || echo "leak checking off (not supported on $(uname -s) $(uname -m))"
+
+if [ "$(uname -s)" != Darwin ]; then
+  echo "ThreadSanitizer off: it runs on the macOS host only (see the header)"
+  exit $fail
+fi
+TSAN="$ROOT/build/tsan"
+mkdir -p "$TSAN"
+rsync -a --delete --exclude build "$ROOT/Makefile" "$ROOT/java" "$ROOT/src" "$ROOT/third_party" "$ROOT/tests" "$TSAN/"
+make -C "$TSAN" clean > /dev/null
+make -C "$TSAN" CFLAGS="-O1 -g -fno-omit-frame-pointer -fsanitize=thread" build/beagle \
+  > "$TSAN/make.log" 2>&1 || { echo "FAIL ThreadSanitizer build ($TSAN/make.log)"; exit 1; }
+echo "PASS ThreadSanitizer build"
+while read -r name expect _ args; do
+  selected "$name" || continue
+  for traced in no yes; do
+    [ $traced = yes ] && ! thread_dependent "$expect" && continue
+    out="$OUT/$name.tsan.$traced"
+    trace=()
+    [ $traced = yes ] && { mkdir -p "$out.trace"; trace=(trace="$out.trace"); }
+    case_verdict "$expect" "$args" "$out" 18 "$TSAN/build/beagle" ${trace[@]+"${trace[@]}"}
+    ok=$?
+    if grep -q ThreadSanitizer "$out.log"; then
+      echo "FAIL $name nthreads=18 traced=$traced: ThreadSanitizer report"; grep -A20 ThreadSanitizer "$out.log" | head -40; fail=1
+    elif [ $ok -eq 0 ]; then
+      echo "PASS $name nthreads=18 traced=$traced tsan"
+    else
+      echo "FAIL $name nthreads=18 traced=$traced tsan $VERDICT"; tail -5 "$out.log"; fail=1
+    fi
+  done
+done < <(cases)
+exit $fail

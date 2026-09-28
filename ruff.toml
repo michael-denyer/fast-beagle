@@ -1,0 +1,3 @@
+# Shared by the pre-commit hook and any direct `ruff` run.
+# Matches the width the scripts already use, so formatting does not rewrap them.
+line-length = 120

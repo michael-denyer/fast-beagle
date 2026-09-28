@@ -1,0 +1,9 @@
+# Trace-only cases: input edge cases compared by tests/check-trace.sh, not by the oracle.
+# name  expected-exit  tags  Beagle arguments (@ is the data directory)
+edge-markers  exit=1  -           gt=@edge-markers.vcf.gz
+edge-crlf     exit=0  -           gt=@edge-crlf.vcf.gz
+edge-latin1   exit=0  -           gt=@edge-latin1.vcf.gz
+edge-noeol    exit=0  -           gt=@edge-noeol.vcf.gz
+imp-chroms-noimpute  exit=1  -           ref=@ref.chroms.vcf.gz gt=@target.chroms.vcf.gz impute=false
+edge-dense    exit=0  -           gt=@edge-dense.vcf.gz
+edge-bref3    exit=0  -           ref=@edge-bref3.bref3 gt=@edge-bref3-target.vcf.gz

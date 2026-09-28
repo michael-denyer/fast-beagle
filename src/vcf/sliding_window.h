@@ -1,0 +1,55 @@
+/*
+ * Copyright (C) 2014-2021 Brian L. Browning
+ * Ported to C from Beagle 5.5 (27Feb25) vcf/SlidingWindow.java,
+ * vcf/RefTargSlidingWindow.java, vcf/TargSlidingWindow.java and
+ * vcf/Window.java; modified 2026.
+ *
+ * This file is part of beagle-c, a C port of Beagle. It is free software:
+ * you can redistribute it and/or modify it under the terms of the GNU General
+ * Public License as published by the Free Software Foundation, either version 3
+ * of the License, or (at your option) any later version. See LICENSE.
+ */
+#ifndef VCF_SLIDING_WINDOW_H
+#define VCF_SLIDING_WINDOW_H
+
+#include <stdbool.h>
+
+#include "main/par.h"
+#include "vcf/genetic_map.h"
+#include "vcf/gt_rec.h"
+#include "vcf/marker_indices.h"
+#include "vcf/ref_gt_rec.h"
+#include "vcf/samples.h"
+
+/* One analysis window. The target records are those also in the reference
+ * (or all target records without a reference); the reference records include
+ * the reference-only markers to impute. Records at the end of a window are
+ * shared with the next window's overlap. */
+typedef struct {
+    int index;             /* from 1 */
+    bool last_window;
+    int chrom_index;       /* of the first target marker */
+    marker_indices indices;
+    int n_targ;
+    gt_rec **targ;
+    int n_ref;             /* 0 without a reference */
+    ref_gt_rec **ref;
+} window;
+
+/* Target haplotype hap's phased allele at target marker m of a window, from
+ * the phasing result ctx. */
+typedef int (*phased_allele_fn)(const void *ctx, int m, int hap);
+
+/* Reads windows of window= cM (at most window-markers= markers) that overlap
+ * by overlap= cM, as Beagle's SlidingWindow implementations do. */
+typedef struct sliding_window sliding_window;
+
+sliding_window *sliding_window_open(const par *p);
+const samples *sliding_window_targ_samples(const sliding_window *sw);
+const genetic_map *sliding_window_gen_map(const sliding_window *sw);
+/* The next window, or NULL after the last. The caller frees it with window_free. */
+window *sliding_window_next(sliding_window *sw);
+void window_free(window *w);
+void sliding_window_close(sliding_window *sw);
+
+#endif

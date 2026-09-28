@@ -1,0 +1,48 @@
+# name  hash  tags  Beagle arguments (@ is the data directory)
+# The hash field is thread:hash pairs where the output depends on nthreads:
+# PbwtPhaser splits windows longer than 4 cM by thread count.
+# Tags, comma-separated or - for none, tell tests/check-bgen.sh how plink2
+# reads the output: nonautosome marks a chromosome that plink2 does not read as
+# an autosome without --chr-set, such as chrX, and multiallelic marks records
+# with more than two alleles, which plink2 imports with --import-max-alleles 2.
+gt        f984b768ab77c6fc  -           gt=@test.vcf.gz
+ref       8d852515c02be9b8  -           ref=@ref.vcf.gz gt=@target.vcf.gz
+imp       d3c663e69eeec762  -           ref=@ref.vcf.gz gt=@target.thin.vcf.gz
+imp-apgp  7802f1b2c1f27cc6  -           ref=@ref.vcf.gz gt=@target.thin.vcf.gz ap=true gp=true
+imp-bref3 d3c663e69eeec762  -           ref=@ref.bref3 gt=@target.thin.vcf.gz
+# A bref3 reference is sequence coded before excludemarkers= and
+# excludesamples= apply, a VCF reference after, so these differ from imp-excl
+# and from the same run on ref.vcf.gz.
+imp-bref3-excl 590eaaa46a16d339  -           ref=@ref.bref3 gt=@target.thin.vcf.gz excludemarkers=@exclude.markers
+imp-bref3-excls eccf9530577570ab  -           ref=@ref.bref3 gt=@target.thin.vcf.gz excludesamples=@exclude.samples
+imp-bref3-multi b97d7f613fc9bf03  multiallelic ref=@ref.multi.bref3 gt=@target.multi.thin.vcf.gz
+imp-bref3-end 1e98c6f082b64055  -           ref=@ref.end.bref3 gt=@target.thin.vcf.gz
+imp-chrom 89d2ea4e5b079431  -           ref=@ref.vcf.gz gt=@target.thin.vcf.gz chrom=22:20020000-20080000
+gt-map    4df47d88a10ad128  -           gt=@test.vcf.gz map=@map.map window=1.5 overlap=0.5
+# gt-map with numbers in other scripts, which Integer.parseInt reads.
+gt-udigit 4df47d88a10ad128  -           gt=@test.udigit.vcf.gz map=@map.udigit.map window=1.5 overlap=0.5
+imp-map   c191c9d10af579ea  -           ref=@ref.vcf.gz gt=@target.thin.vcf.gz map=@map.map window=1.5 overlap=0.5
+gt-miss   9eab7a66d6b5dff9  -           gt=@test.miss.vcf.gz
+imp-miss  e9628d6d04aa31b6  -           ref=@ref.vcf.gz gt=@target.thin.miss.vcf.gz
+gt-excl   25614a1eaa25e2a3  -           gt=@test.vcf.gz excludesamples=@exclude.samples excludemarkers=@exclude.markers
+imp-excl  4dfa20ee3b6e34d1  -           ref=@ref.vcf.gz gt=@target.thin.vcf.gz excludemarkers=@exclude.markers
+gt-x      9fec4deb80b6a504  nonautosome gt=@test.X.vcf.gz
+imp-x     4336b2caac95998e  nonautosome ref=@ref.X.vcf.gz gt=@target.X.thin.vcf.gz
+gt-multi  3461c08584af37b9  multiallelic gt=@test.multi.vcf.gz
+imp-multi b97d7f613fc9bf03  multiallelic ref=@ref.multi.vcf.gz gt=@target.multi.thin.vcf.gz
+gt-phased 24336aa1cf2a85ac  -           gt=@ref.vcf.gz
+imp-chroms 9e7ab9d12e48171c  nonautosome ref=@ref.chroms.vcf.gz gt=@target.chroms.vcf.gz
+gt-ibs2   1:a4632d87e291b72c,2:d47af40d60431f3e,18:e98a403d5ee20e87  -           gt=@test.ibs2.vcf.gz map=@map.steep.map
+imp-bigref e8f6faa6c2cb5d33  -           ref=@ref.big.vcf.gz gt=@target.300.vcf.gz
+gt-ibs2-miss 1:ef140b6aafdfba7a,2:1c4f6942712da627,18:f03523b06302fb2a  -           gt=@test.ibs2.miss.vcf.gz map=@map.steep.map
+gt-573    42241a422d8075ef  -           gt=@test.573.vcf.gz
+gt-states 376c69eb98291020  -           gt=@test.vcf.gz phase-states=10
+imp-states dbeaf447196a3811  -           ref=@ref.vcf.gz gt=@target.thin.vcf.gz imp-states=10
+imp-evict 857e35c8bd392e17  -           ref=@ref.vcf.gz gt=@target.thin.vcf.gz map=@map.map window=1.5 overlap=0.5 imp-states=10 imp-segment=0.1
+imp-gap   dfe2fbe380f2003c  -           ref=@ref.vcf.gz gt=@target.gap.vcf.gz
+# Every marker in stage 1, so no stage 2: more than 75% of the markers are
+# high-frequency (gt-common, and in 10 of gt-common-map's 12 windows) or fewer
+# than 2 are (gt-rare).
+gt-common 157cfa67120dc9f3  -           gt=@test.common.vcf.gz
+gt-common-map c96dc1be7e861a1f  -           gt=@test.common.vcf.gz map=@map.map window=0.6 overlap=0.2
+gt-rare   81f328aed13131ef  -           gt=@test.rare.vcf.gz

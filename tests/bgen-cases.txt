@@ -1,0 +1,9 @@
+# Cases only tests/check-bgen.sh runs, on fixtures tests/fetch-fixtures.sh
+# derives for it. They have no oracle hash, so their runs must exit 0.
+# name  expected-exit  tags  Beagle arguments (@ is the data directory)
+# The chrX fixture moved to chromosome 22, whose haploid samples plink2
+# imports with doubled DS.
+imp-hap22  exit=0  -            ref=@ref.hap22.vcf.gz gt=@target.hap22.thin.vcf.gz
+# The imp fixture moved to chromosome 38, an autosome only under
+# bgen-chr-set=38 (--chr-set 38).
+imp-chr38  exit=0  nonautosome  ref=@ref.chr38.vcf.gz gt=@target.chr38.thin.vcf.gz
