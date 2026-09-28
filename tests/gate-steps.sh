@@ -70,6 +70,7 @@ trace_threads() {
 }
 
 step fixtures tests/fetch-fixtures.sh
+step gate-tier tests/check-gate-tier.sh
 full_step cases python3 tests/check_cases.py
 full_step jcompat make check-jcompat
 step tracker make check-tracker

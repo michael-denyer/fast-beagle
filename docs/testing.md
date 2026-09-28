@@ -191,7 +191,7 @@ tests/check-local.sh
 
 Two GitHub Actions workflows define the same checks:
 
-- `.github/workflows/gate.yml` runs `tests/gate-steps.sh` on GitHub-hosted `macos-latest` (arm64) and `ubuntu-latest` (x86_64) runners. Pushes to `main` and pull requests run the C tier. A pull request runs the full tier if it changes `java/`, `src/jcompat/`, `tla/`, the workflow, or the scripts and tables the Java-side checks use. Manual runs use the full tier with random fuzz examples. The nightly run does the same, and skips itself when `main` has not moved since the last nightly run that passed.
+- `.github/workflows/gate.yml` runs `tests/gate-steps.sh` on GitHub-hosted `macos-latest` (arm64) and `ubuntu-latest` (x86_64) runners. Pushes to `main` run the C tier. A pull request runs the C tier when it changes only files under `src/` (except `src/jcompat/`), `third_party/` or `docs/`, or Markdown files, and the full tier otherwise, so a change to any test script or table runs the full tier. `tests/gate-tier.sh` holds that rule, and the `gate-tier` step checks it with `tests/check-gate-tier.sh`. Manual runs use the full tier with random fuzz examples. The nightly run does the same, and skips itself when `main` has not moved since the last nightly run that passed.
 - `.github/workflows/lint.yml` runs every hook in `.pre-commit-config.yaml` on the macOS runner.
 
 ## Run the lint hooks
