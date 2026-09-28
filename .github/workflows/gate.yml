@@ -19,7 +19,50 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Picks the tier. Pull requests and pushes to main run the C tier, which
+  # compares the C binary against recorded results, unless a pull request
+  # changes what those results or the Java-side checks rest on. The nightly run
+  # uses the full tier with random fuzz examples, and is skipped when main has
+  # not moved since its last success. Manual runs use the full tier.
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      pull-requests: read
+    outputs:
+      run: ${{ steps.plan.outputs.run }}
+      tier: ${{ steps.plan.outputs.tier }}
+      fuzz: ${{ steps.plan.outputs.fuzz }}
+    steps:
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.sha }}
+        run: |
+          run=true tier=c fuzz=fixed
+          case $EVENT in
+            pull_request)
+              if gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename' \
+                  | grep -E '^(java/|src/jcompat/|tla/|\.github/workflows/gate\.yml$|tests/(jcompat/|fuzz-regressions/|oracle-cases\.txt|trace-cases\.txt|fetch-fixtures\.sh|cases\.sh|gate-steps\.sh|check-oracle\.sh|check-failures\.sh|check-trace\.sh|run-trace\.sh|check-sanitizers\.sh|check-tla\.sh|check_fuzz\.py))'; then
+                tier=full
+              fi ;;
+            workflow_dispatch) tier=full fuzz=random ;;
+            schedule)
+              tier=full fuzz=random
+              last=$(gh api "repos/$REPO/actions/workflows/gate.yml/runs?branch=main&event=schedule&status=success&per_page=1" \
+                --jq '.workflow_runs[0].head_sha // ""')
+              if [ "$last" = "$SHA" ]; then run=false; fi ;;
+          esac
+          echo "run=$run tier=$tier fuzz=$fuzz"
+          { echo "run=$run"; echo "tier=$tier"; echo "fuzz=$fuzz"; } >> "$GITHUB_OUTPUT"
+
   gate:
+    needs: plan
+    if: needs.plan.outputs.run == 'true'
     timeout-minutes: 150
     strategy:
       fail-fast: false
@@ -30,25 +73,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0
-      # Pull requests run the fast tier unless they change what the recorded
-      # oracle hashes rest on: the Java source, the case table or the fixtures.
-      # Pushes to main, manual runs and the nightly run use the full gate.
-      - name: Choose the gate tier
-        env:
-          EVENT: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          tier="full"
-          if [ "$EVENT" = pull_request ]; then
-            tier="pr"
-            if git diff --name-only "$BASE_SHA" HEAD \
-                | grep -E '^(java/|tests/(oracle-cases\.txt|fetch-fixtures\.sh|cases\.sh|check-oracle\.sh))'; then
-              tier="full"
-            fi
-          fi
-          echo "GATE_TIER=$tier" >> "$GITHUB_ENV"
-          echo "gate tier: $tier"
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6  # v6.0.1
         with:
           distribution: temurin
@@ -83,7 +107,17 @@ jobs:
           path: data
           key: fixtures-${{ hashFiles('tests/fetch-fixtures.sh') }}
       - name: Gate
+        env:
+          GATE_TIER: ${{ needs.plan.outputs.tier }}
+          GATE_FUZZ: ${{ needs.plan.outputs.fuzz }}
         run: PLINK2="$RUNNER_TEMP/plink2/plink2" tests/gate-steps.sh .
       - name: Tail of every check log
         if: failure()
         run: tail -n 40 build/check-*.log
+      - name: Keep the shrunk fuzz failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: fuzz-fail-${{ matrix.runner }}
+          path: build/fuzz-fail
+          if-no-files-found: ignore

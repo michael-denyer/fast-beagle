@@ -16,7 +16,7 @@
 +/**
 + * Trace dumps for comparing the C port with this Java source. Enabled by
 + * {@code -Dbeagle.trace=<dir>}; each seam writes {@code <dir>/<seam>.txt}.
-+ * Not part of Beagle: added by beagle-c's java/trace.patch.
++ * Not part of Beagle: added by fast-beagle's java/trace.patch.
 + */
 +public final class Trace {
 +

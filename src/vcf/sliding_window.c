@@ -4,7 +4,7 @@
  * vcf/RefTargSlidingWindow.java, vcf/TargSlidingWindow.java and
  * vcf/Window.java; modified 2026.
  *
- * This file is part of beagle-c, a C port of Beagle. It is free software:
+ * This file is part of fast-beagle, a C port of Beagle. It is free software:
  * you can redistribute it and/or modify it under the terms of the GNU General
  * Public License as published by the Free Software Foundation, either version 3
  * of the License, or (at your option) any later version. See LICENSE.
@@ -116,7 +116,7 @@ static bool ref_has_next(sliding_window *sw) {
 }
 
 sliding_window *sliding_window_open(const par *p) {
-    if (p->ped != NULL) util_exit("beagle-c: the ped= parameter is not supported");
+    if (p->ped != NULL) util_exit("fast-beagle: the ped= parameter is not supported");
     sliding_window *sw = util_malloc(sizeof *sw);
     *sw = (sliding_window){0};
     const chrom_interval *interval = p->has_chrom_int ? &p->chrom_int : NULL;

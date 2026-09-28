@@ -145,7 +145,7 @@ Failed runs must leave no `.bgen`, `.sample` or `.info`. The rule covers runs th
   - a value out of bounds or not a number
   - an unknown parameter
 - The script shrinks a failure to a small input and saves it in `build/fuzz-fail` with both commands. Inputs from past failures go in `tests/fuzz-regressions/`, which runs first.
-- The gate runs a fixed set of 200 examples (about 30 s per 100 on an M5) and 2 for each invalid-parameter change. `uv run --python 3.12 --script tests/check_fuzz.py --examples 1000 --random` tries new ones.
+- The full tier runs a fixed set of 200 examples (about 30 s per 100 on an M5) and 2 for each invalid-parameter change. The nightly CI run fuzzes 200 new examples. `uv run --python 3.12 --script tests/check_fuzz.py --examples 1000 --random` tries new ones.
 
 ## Model check the pipelined writer
 
@@ -167,7 +167,7 @@ The model represents condition-variable waits with wait sets and spurious wakeup
 
 `tests/gate-steps.sh` holds the gate's list of checks. It needs Java 21, htslib, uv, and `PLINK2` naming the [pinned plink2 build](#pinned-plink2-build).
 
-The script has two tiers. The full tier, the default, runs every check. `GATE_TIER=pr` runs the pull-request tier. It skips the checks that re-prove the Java side of the recorded hashes (`oracle-jar`, `failures-jar`, `java-build`, `oracle-source` and `oracle-trace`), the sanitizers, the TLA+ model check and the thread-seam reruns, and it fuzzes 50 examples, not 200. It prints a `skip` line for each check it leaves out.
+The script has two tiers. The full tier, the default, runs every check. `GATE_TIER=c` runs the C tier, which compares `build/beagle` against recorded results only. Java then only builds the bref3 fixtures. The C tier skips every check that runs Java or the jar next to the C binary (`jcompat`, `oracle-jar`, `failures-jar`, `java-build`, `oracle-source`, `java-trace`, `oracle-trace`, `trace`, `fuzz` and `trace-threads`), the sanitizers and the TLA+ model check. It runs the saved fuzz regressions in `tests/fuzz-regressions/` as `fuzz-regressions`. It prints a `skip` line for each check it leaves out. `GATE_FUZZ=random` makes the full tier fuzz 200 new examples instead of the fixed 200.
 
 `tests/check-local.sh` is the pre-merge gate. It runs the lint hooks once, then every check in `tests/gate-steps.sh` natively and on Linux x86_64 in docker. It prints one pass or fail line per check.
 
@@ -177,7 +177,7 @@ tests/check-local.sh
 
 Two GitHub Actions workflows define the same checks:
 
-- `.github/workflows/gate.yml` runs `tests/gate-steps.sh` on GitHub-hosted `macos-latest` (arm64) and `ubuntu-latest` (x86_64) runners. Pull requests run the pull-request tier, unless they change `java/`, `tests/oracle-cases.txt`, `tests/fetch-fixtures.sh`, `tests/cases.sh` or `tests/check-oracle.sh`. Pushes to `main`, manual runs and a nightly run use the full tier.
+- `.github/workflows/gate.yml` runs `tests/gate-steps.sh` on GitHub-hosted `macos-latest` (arm64) and `ubuntu-latest` (x86_64) runners. Pushes to `main` and pull requests run the C tier. A pull request runs the full tier if it changes `java/`, `src/jcompat/`, `tla/`, the workflow, or the scripts and tables the Java-side checks use. Manual runs use the full tier with random fuzz examples. The nightly run does the same, and skips itself when `main` has not moved since the last nightly run that passed.
 - `.github/workflows/lint.yml` runs every hook in `.pre-commit-config.yaml` on the macOS runner.
 
 ## Run the lint hooks
