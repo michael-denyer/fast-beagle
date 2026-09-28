@@ -1,6 +1,6 @@
 # Parameters and output files
 
-fast-beagle takes Beagle 5.5's `key=value` arguments and writes Beagle's output. This page lists what differs from Beagle and the parameters that fast-beagle adds. For every other parameter, see the [Beagle 5.5 documentation](https://faculty.washington.edu/browning/beagle/beagle.html). [How fast-beagle differs from Beagle 5.5](beagle-divergences.md) lists every other difference, such as the log file, console output and error messages.
+fast-beagle takes Beagle 5.5's `key=value` arguments and writes Beagle's output. This page lists what differs from Beagle and the parameters that fast-beagle adds. For every other parameter, see the [Beagle 5.5 documentation](https://faculty.washington.edu/browning/beagle/beagle.html). [How fast-beagle differs from Beagle 5.5](beagle-divergences.md) lists every other difference.
 
 ## Run a phasing or imputation job
 
@@ -67,6 +67,23 @@ Both `bgen=` modes also write `<out>.info`, the fields BGEN has no place for. Th
 ### Failed runs
 
 If a `bgen=` run fails before the BGEN files are complete, it removes the `.bgen`, `.info` and `.sample` it has created.
+
+## Log file and console output
+
+fast-beagle prints Beagle's progress report to standard output and writes the same text to `<out>.log`. The report has Beagle's lines: the start time, the command line with `nthreads=` added when you did not set it, the sample counts, the markers in each window, the estimated `ne` and `err`, the time of each phasing iteration and imputation step, and the totals. `tests/check-log.sh` checks that these lines match Beagle's.
+
+The report differs from Beagle's in these lines:
+
+| Line | fast-beagle |
+|---|---|
+| Banner | `fast-beagle: a C port of beagle.27Feb25.75f.jar (version 5.5)` and the copyright line |
+| `Command line:` | The program path as you ran it, in place of `java -Xmx<heap>m -jar beagle.27Feb25.75f.jar` |
+| `Total time:` | Includes closing the output files |
+| `CPU time:` | User plus system CPU time. Beagle does not print it. |
+| `Max memory:` | The max resident memory in MB. Beagle does not print it. |
+| Last line | `fast-beagle finished` |
+
+An error message goes to standard error without Java's exception class or stack trace. When the run fails after it has created `<out>.log`, fast-beagle also writes the message at the end of the log, so the log shows why the run stopped.
 
 ## Tabix index
 

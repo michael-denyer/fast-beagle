@@ -14,12 +14,27 @@
 #include <stdlib.h>
 #include <string.h>
 
+static FILE *exit_log;
+
+void util_exit_log(FILE *log) {
+    exit_log = log;
+}
+
 void util_exit(const char *fmt, ...) {
+    fflush(stdout);   /* progress lines first, as Java's autoflushed System.out */
     va_list ap;
     va_start(ap, fmt);
+    va_list ap2;
+    va_copy(ap2, ap);
     vfprintf(stderr, fmt, ap);
-    va_end(ap);
     fputc('\n', stderr);
+    if (exit_log != NULL) {
+        vfprintf(exit_log, fmt, ap2);
+        fputc('\n', exit_log);
+        fclose(exit_log);
+    }
+    va_end(ap2);
+    va_end(ap);
     exit(1);
 }
 

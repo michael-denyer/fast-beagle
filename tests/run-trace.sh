@@ -1,7 +1,7 @@
 #!/bin/bash
 # Run an implementation on every case in tests/oracle-cases.txt and
 # tests/trace-cases.txt, writing each case's trace seams to <outdir>/<case>/
-# and its output to <outdir>/<case>/out.log.
+# and its output to <outdir>/<case>/out.run.log.
 # The command's {trace} argument is replaced by that directory.
 #
 # Usage: tests/run-trace.sh <outdir> <command...>

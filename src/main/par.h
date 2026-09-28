@@ -39,7 +39,12 @@ typedef struct {
     bool em;
     float ne, err, window, overlap, buffer;
     int window_markers, nthreads;
+    bool no_nthreads;      /* nthreads= was absent */
     int64_t seed;
+
+    /* the arguments as given, for the log's command line */
+    int argc;
+    char **argv;
 
     /* fast-beagle only: directory for trace seams, or NULL */
     const char *trace;

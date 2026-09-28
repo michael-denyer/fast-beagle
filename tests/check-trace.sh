@@ -20,7 +20,7 @@ while read -r name exit_java _; do
     echo "PASS $name $exit_java"
   else
     echo "FAIL $name java $exit_java, C ${exit_c:-no run}"
-    tail -5 "$OUT/java/$name/out.log" "$OUT/c/$name/out.log"
+    tail -5 "$OUT/java/$name/out.run.log" "$OUT/c/$name/out.run.log"
     fail=1
   fi
 done < "$OUT/java.txt"

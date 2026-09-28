@@ -140,6 +140,10 @@ const samples *sliding_window_targ_samples(const sliding_window *sw) {
     return sample_file_it_samples(sw->targ_it);
 }
 
+int sliding_window_n_ref_samples(const sliding_window *sw) {
+    return sw->ref_it.ops == NULL ? 0 : sample_file_it_samples(sw->ref_it)->n;
+}
+
 const genetic_map *sliding_window_gen_map(const sliding_window *sw) {
     return sw->gen_map;
 }

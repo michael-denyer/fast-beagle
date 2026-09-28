@@ -46,6 +46,8 @@ typedef struct sliding_window sliding_window;
 
 sliding_window *sliding_window_open(const par *p);
 const samples *sliding_window_targ_samples(const sliding_window *sw);
+/* The reference samples after excludesamples=, 0 without a reference. */
+int sliding_window_n_ref_samples(const sliding_window *sw);
 const genetic_map *sliding_window_gen_map(const sliding_window *sw);
 /* The next window, or NULL after the last. The caller frees it with window_free. */
 window *sliding_window_next(sliding_window *sw);

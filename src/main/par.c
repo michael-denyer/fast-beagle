@@ -186,6 +186,8 @@ void par_parse(par *p, int argc, char **argv) {
     const int IMAX = INT32_MAX;
     const float FMIN = FLT_TRUE_MIN, FMAX = FLT_MAX;
     memset(p, 0, sizeof *p);
+    p->argc = argc;
+    p->argv = argv;
     args_map m;
     args_to_map(&m, argc, argv);
 
@@ -228,7 +230,8 @@ void par_parse(par *p, int argc, char **argv) {
     p->seed = long_arg(&m, "seed", -99999, INT64_MIN, INT64_MAX);
     int raw_nthreads = int_arg(&m, "nthreads", IMAX, 1, IMAX);
     long n_cpus = sysconf(_SC_NPROCESSORS_ONLN);
-    p->nthreads = raw_nthreads == IMAX ? (n_cpus > 0 ? (int)n_cpus : 1) : raw_nthreads;
+    p->no_nthreads = raw_nthreads == IMAX;
+    p->nthreads = p->no_nthreads ? (n_cpus > 0 ? (int)n_cpus : 1) : raw_nthreads;
 
     file_arg(&m, "truth", false);
     p->trace = string_arg(&m, "trace", false);

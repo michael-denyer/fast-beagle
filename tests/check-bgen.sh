@@ -110,7 +110,7 @@ run_plink2() {  # vcf out beagle-args...
 check_match() {  # label out beagle-args...
   local label=$1 b=$2.beagle p=$2.plink2 got decoded; shift 2
   case_verdict "$expect" "$args" "$b" $THREADS "$BEAGLE" bgen=plink2 "$@" \
-    || { failed "$label beagle $VERDICT $(tail -1 "$b.log")"; return; }
+    || { failed "$label beagle $VERDICT $(tail -1 "$b.run.log")"; return; }
   run_plink2 "$b.vcf.gz" "$p" "$@" || { failed "$label plink2 exit=$?: $(grep -m1 '^Error' "$p.plink2.log")"; return; }
   if ! cmp "$b.bgen" "$p.bgen" || ! cmp "$b.sample" "$p.sample"; then
     failed "$label bgen or sample differs"; return
@@ -126,7 +126,7 @@ check_match() {  # label out beagle-args...
 check_both_fail() {  # label out message beagle-args...
   local label=$1 b=$2.beagle v=$2.vcfonly p=$2.plink2 message=$3; shift 3
   case_run "$args" "$b" $THREADS "$BEAGLE" bgen=plink2 "$@"
-  refused "$b.log" $? "$message" "$b.bgen" "$b.info" "$b.sample" || { failed "$label bgen=plink2 $VERDICT"; return; }
+  refused "$b.run.log" $? "$message" "$b.bgen" "$b.info" "$b.sample" || { failed "$label bgen=plink2 $VERDICT"; return; }
   case_verdict "$expect" "$args" "$v" $THREADS "$BEAGLE" || { failed "$label beagle without bgen= $VERDICT"; return; }
   if run_plink2 "$v.vcf.gz" "$p" "$@"; then failed "$label plink2 succeeded"; return; fi
   pass "$label fails in both: $(grep -m1 -A1 '^Error' "$p.plink2.log" | tr '\n' ' ')"
@@ -137,7 +137,7 @@ check_both_fail() {  # label out message beagle-args...
 check_phased() {  # label out beagle-args...
   local label=$1 b=$2.phased rows decoded got; shift 2
   case_verdict "$expect" "$args" "$b" $THREADS "$BEAGLE" bgen=phased "$@" \
-    || { failed "$label beagle $VERDICT $(tail -1 "$b.log")"; return; }
+    || { failed "$label beagle $VERDICT $(tail -1 "$b.run.log")"; return; }
   got=$(python3 "$ROOT/tests/check_bgen_phased.py" "$b.bgen" "$b.vcf.gz") \
     || { failed "$label: $got"; return; }
   if ! has_tag "$tags" nonautosome; then

@@ -52,11 +52,12 @@ vcf_hash() {  # vcf.gz
 }
 
 # Runs command with the case's arguments (@ as the data directory), then out,
-# seed and nthreads, writing its output to <out>.log.
+# seed and nthreads, writing its standard output and error to <out>.run.log,
+# since Beagle writes <out>.log itself.
 case_run() {  # args out nthreads command...
   local args=$1 out=$2 t=$3; shift 3
   # shellcheck disable=SC2086  # args is the case's argument list; splitting it is the point
-  "$@" ${args//@/$DATA/} out="$out" seed=$SEED nthreads="$t" > "$out.log" 2>&1
+  "$@" ${args//@/$DATA/} out="$out" seed=$SEED nthreads="$t" > "$out.run.log" 2>&1
 }
 
 # Runs a case and judges it: the run must exit as expect says, and a case with

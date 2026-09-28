@@ -42,6 +42,10 @@ Every case table row holds a name, the expected outcome, tags and Beagle's argum
 - `tests/cases.sh` also holds the one refusal rule that `tests/check-failures.sh` and `tests/check-bgen.sh` apply. The rule requires exit 1, the expected message, and no file at the paths the caller lists.
 - `tests/check_cases.py` tests the verdict and the refusal rule with a fake Beagle.
 
+## Log and console output
+
+`tests/check-log.sh` runs Java Beagle and `build/beagle` on each oracle case and compares their `<out>.log` files. It masks the timings, the start and end times, `out=` and the lines that name the program, and drops fast-beagle's `CPU time:` and `Max memory:` lines. Every other line must match. fast-beagle's standard output must also equal its log, and a run that fails on a malformed reference must end its log with the error message. `CASES` restricts the cases and `NTHREADS` sets the thread count, default 2. The full gate tier runs it.
+
 ## Refused inputs
 
 `tests/check-failures.sh` runs an implementation on arguments and inputs that Beagle refuses. Each run must exit 1 with Java's message. The cases are:
