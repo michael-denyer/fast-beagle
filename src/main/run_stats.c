@@ -8,6 +8,12 @@
  * Public License as published by the Free Software Foundation, either version 3
  * of the License, or (at your option) any later version. See LICENSE.
  */
+/* clock_gettime and localtime_r are POSIX, which glibc hides under -std=c11.
+ * macOS shows them anyway, and this macro would hide its ru_maxrss. */
+#ifndef __APPLE__
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include "main/run_stats.h"
 
 #include <htslib/kstring.h>
