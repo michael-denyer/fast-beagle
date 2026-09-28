@@ -173,7 +173,7 @@ tests/check-local.sh
 
 Two GitHub Actions workflows define the same checks:
 
-- `.github/workflows/gate.yml` runs `tests/gate-steps.sh` on two self-hosted runners, macOS arm64 and Linux arm64. Pull requests run the pull-request tier, unless they change `java/`, `tests/oracle-cases.txt`, `tests/fetch-fixtures.sh`, `tests/cases.sh` or `tests/check-oracle.sh`. Pushes to `main`, manual runs and a nightly run use the full tier. plink2 has no Linux arm64 build, so the Linux runner runs the pinned x86_64 plink2 through x86_64 emulation.
+- `.github/workflows/gate.yml` runs `tests/gate-steps.sh` on GitHub-hosted `macos-latest` (arm64) and `ubuntu-latest` (x86_64) runners. Pull requests run the pull-request tier, unless they change `java/`, `tests/oracle-cases.txt`, `tests/fetch-fixtures.sh`, `tests/cases.sh` or `tests/check-oracle.sh`. Pushes to `main`, manual runs and a nightly run use the full tier.
 - `.github/workflows/lint.yml` runs every hook in `.pre-commit-config.yaml` on the macOS runner.
 
 ## Run the lint hooks

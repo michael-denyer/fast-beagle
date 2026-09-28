@@ -24,9 +24,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Self-hosted runners: macOS arm64 and Linux arm64.
-        runner: [macos-arm64, linux-arm64]
-    runs-on: [self-hosted, "${{ matrix.runner }}"]
+        runner: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -66,9 +65,7 @@ jobs:
       - name: Install htslib (macOS)
         if: runner.os == 'macOS'
         run: brew list htslib > /dev/null 2>&1 || brew install htslib
-      # The plink2 build tests/check-bgen.sh pins (see docs/testing.md). plink2
-      # has no Linux arm64 build, so the Linux runner runs the x86_64 binary
-      # through the host's x86_64 emulation.
+      # The plink2 build tests/check-bgen.sh pins (see docs/testing.md).
       - name: Install plink2 (Linux)
         if: runner.os == 'Linux'
         run: |
