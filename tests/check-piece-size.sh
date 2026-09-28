@@ -32,7 +32,7 @@ while read -r name _ _ args; do
       case_run "$args" "$dir/out" "$t" "$bin" "trace=$dir"
       rc=$?
       if [ $rc != 0 ]; then
-        echo "FAIL $name nthreads=$t $bin exit=$rc"; tail -5 "$dir/out.log"; run_ok=0
+        echo "FAIL $name nthreads=$t $bin exit=$rc"; tail -5 "$dir/out.run.log"; run_ok=0
       fi
       touch "$dir/T5d.txt"
     done

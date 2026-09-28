@@ -1,6 +1,6 @@
 # How fast-beagle differs from Beagle 5.5
 
-fast-beagle is a C port of Java Beagle 5.5 (`beagle.27Feb25.75f.jar`). Run with the same arguments and the same `nthreads=`, it writes a VCF whose text is byte-identical to Beagle's, header lines included. Everything else on this page is a difference you can see when you switch. fast-beagle writes no log file and prints nothing while it runs. Its error messages carry the same text without Java's exception class, stack trace or usage text. It refuses `ped=` and runs without a JVM or a heap limit. It also adds BGEN output, a tabix index and a trace parameter.
+fast-beagle is a C port of Java Beagle 5.5 (`beagle.27Feb25.75f.jar`). Run with the same arguments and the same `nthreads=`, it writes a VCF whose text is byte-identical to Beagle's, header lines included. Everything else on this page is a difference you can see when you switch. It refuses `ped=` and runs without a JVM or a heap limit. It also adds BGEN output, a tabix index and a trace parameter.
 
 ## Differences at a glance
 
@@ -8,10 +8,7 @@ fast-beagle is a C port of Java Beagle 5.5 (`beagle.27Feb25.75f.jar`). Run with 
 |---|---|---|
 | VCF text | The reference output | Byte-identical at the same `nthreads=` |
 | `.vcf.gz` file bytes | BGZF from Beagle's own writer | BGZF from htslib, so the compressed bytes differ |
-| `<out>.log` | Written on every run that passes parameter checks | Not written |
-| Standard output | Banner, command line, sample and marker counts, estimated `ne` and `err`, timings | Nothing |
 | No arguments | Prints the usage text and exits 0 | Prints `missing gt argument` and exits 1 |
-| Error output | Message, often with the exception class and a stack trace | The message only |
 | Exit status on error | 1 | 1 |
 | `ped=` | Accepted and ignored | Refused |
 | Added parameters | None | `bgen=`, `bgen-bits=`, `bgen-min-dr2=`, `bgen-min-maf=`, `bgen-chr-set=`, `tbi=`, `trace=` |
@@ -28,31 +25,17 @@ The decompressed VCF is byte-identical to Beagle's when both run with the same a
 
 The compressed `.vcf.gz` files differ byte for byte. Beagle compresses with its own BGZF writer and fast-beagle compresses with htslib. Both files are valid BGZF, and `bgzip -t` accepts both. Compare the decompressed text, not the `.vcf.gz` bytes.
 
-### The log file
-
-Beagle writes `<out>.log`, a copy of everything it prints to standard output. fast-beagle writes no log file. Beagle also creates `<out>.log` for a run that fails after the parameter checks, such as a run with a `ref=` file that it cannot read.
-
 ### BGEN files and the tabix index
 
 fast-beagle can also write `<out>.bgen`, `<out>.sample`, `<out>.info` and `<out>.vcf.gz.tbi`. Beagle writes none of these. [Parameters and output files](usage.md) describes them.
 
-## Console output
-
-Beagle prints its progress to standard output as it runs. The output starts with the program name, the copyright line and the start time. It then lists the command line, with `nthreads=` added when you did not set it. It prints the sample counts, the markers in each window, and the estimated `ne` and `err`. It times each burn-in and phasing iteration and each imputation step, and ends with the total times and the end time.
-
-fast-beagle prints nothing to standard output. A successful run is silent, and fast-beagle does not report the estimated `ne` and `err`.
+## No arguments
 
 With no arguments, Beagle prints its usage text and exits with status 0. fast-beagle treats an empty command line like any other command line without `gt=`. It prints `missing gt argument` to standard error and exits with status 1.
 
 ## Errors and exit status
 
-Both tools exit with status 1 when they refuse a run. fast-beagle prints the same message text as Beagle, on standard error. It leaves out the lines Beagle adds around that message:
-
-- For a parameter error, Beagle prints the message after `Exception in thread "main" java.lang.IllegalArgumentException:` and follows it with a stack trace.
-- For an input file that does not exist, Beagle adds `java.lang.Throwable: File does not exist` and a stack trace.
-- For an unrecognized parameter, a missing input file and several input errors, Beagle ends with a blank line and `Terminating program.`
-- For an `out=` that is a directory or names an input file, Beagle prints the full usage text before the message.
-- For a `window=` less than 1.1 times `overlap=`, Beagle prints its banner before the message and `Exiting program.` after it.
+Both tools exit with status 1 when they refuse a run.
 
 When a command line has more than one unrecognized parameter, both tools list them in one message. Beagle lists them in hash-map order. fast-beagle lists them in the order you gave them.
 

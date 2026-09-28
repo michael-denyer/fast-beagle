@@ -24,7 +24,7 @@ while read -r name expect _ args; do
     if case_verdict "$expect" "$args" "$out" "$t" "$@"; then
       echo "PASS $name nthreads=$t $VERDICT"
     else
-      echo "FAIL $name nthreads=$t $VERDICT"; tail -5 "$out.log"; fail=1
+      echo "FAIL $name nthreads=$t $VERDICT"; tail -5 "$out.run.log"; fail=1
     fi
   done
 done < <(cases)

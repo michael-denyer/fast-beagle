@@ -73,6 +73,7 @@ full_step oracle-trace oracle_trace
 step c-build make build/beagle
 step oracle-c tests/check-oracle.sh build/beagle
 step failures-c tests/check-failures.sh build/beagle
+full_step log tests/check-log.sh
 step piece-size make check-piece-size
 step bgen-unit make check-bgen-unit
 step records make check-records

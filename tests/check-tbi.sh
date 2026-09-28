@@ -25,7 +25,7 @@ while read -r name expect _ args; do
   for t in 1 18; do
     out="$OUT/$name.t$t"
     if ! case_verdict "$expect" "$args tbi=true" "$out" "$t" "$BEAGLE"; then
-      echo "FAIL $name nthreads=$t $VERDICT"; tail -5 "$out.log"; fail=1; continue
+      echo "FAIL $name nthreads=$t $VERDICT"; tail -5 "$out.run.log"; fail=1; continue
     fi
     case_run "$args" "$out.plain" "$t" "$BEAGLE"
     if [ "$(vcf_hash "$out.plain.vcf.gz")" != "$(vcf_hash "$out.vcf.gz")" ]; then

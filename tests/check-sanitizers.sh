@@ -51,12 +51,12 @@ while read -r name expect tags args; do
       out="$OUT/$name.t$t.$mode"
       case_verdict "$expect" "$args" "$out" "$t" "$SAN/build/beagle" ${bgen[@]+"${bgen[@]}"}
       ok=$?
-      if grep -Eq "$REPORT" "$out.log"; then
-        echo "FAIL $name nthreads=$t $mode: sanitizer report"; grep -E -A12 "$REPORT" "$out.log" | head -40; fail=1
+      if grep -Eq "$REPORT" "$out.run.log"; then
+        echo "FAIL $name nthreads=$t $mode: sanitizer report"; grep -E -A12 "$REPORT" "$out.run.log" | head -40; fail=1
       elif [ $ok -eq 0 ]; then
         echo "PASS $name nthreads=$t $mode"
       else
-        echo "FAIL $name nthreads=$t $mode $VERDICT"; tail -5 "$out.log"; fail=1
+        echo "FAIL $name nthreads=$t $mode $VERDICT"; tail -5 "$out.run.log"; fail=1
       fi
     done
   done
@@ -84,12 +84,12 @@ while read -r name expect _ args; do
     [ $traced = yes ] && { mkdir -p "$out.trace"; trace=(trace="$out.trace"); }
     case_verdict "$expect" "$args" "$out" 18 "$TSAN/build/beagle" ${trace[@]+"${trace[@]}"}
     ok=$?
-    if grep -q ThreadSanitizer "$out.log"; then
-      echo "FAIL $name nthreads=18 traced=$traced: ThreadSanitizer report"; grep -A20 ThreadSanitizer "$out.log" | head -40; fail=1
+    if grep -q ThreadSanitizer "$out.run.log"; then
+      echo "FAIL $name nthreads=18 traced=$traced: ThreadSanitizer report"; grep -A20 ThreadSanitizer "$out.run.log" | head -40; fail=1
     elif [ $ok -eq 0 ]; then
       echo "PASS $name nthreads=18 traced=$traced tsan"
     else
-      echo "FAIL $name nthreads=18 traced=$traced tsan $VERDICT"; tail -5 "$out.log"; fail=1
+      echo "FAIL $name nthreads=18 traced=$traced tsan $VERDICT"; tail -5 "$out.run.log"; fail=1
     fi
   done
 done < <(cases)
