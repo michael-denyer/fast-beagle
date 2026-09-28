@@ -10,6 +10,8 @@ extend-exclude = [
     "java/src/",
     "data/",
     "build/",
+    # SHA-256 prefixes, not words.
+    "tests/bgen-hashes.txt",
 ]
 
 [default.extend-words]
