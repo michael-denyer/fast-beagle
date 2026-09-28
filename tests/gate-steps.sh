@@ -4,12 +4,14 @@
 # runner. Prints one pass or FAIL line per check; each check's output goes to
 # build/check-<name>.log.
 #
-# Usage: [GATE_TIER=pr] tests/gate-steps.sh <root>
+# Usage: [GATE_TIER=c] [GATE_FUZZ=random] tests/gate-steps.sh <root>
 # Needs Java 21, htslib, uv, and PLINK2 naming the pinned plink2 binary (see
-# tests/check-bgen.sh). GATE_TIER=pr runs the fast pull-request tier: it skips
-# the checks that re-prove the Java side of the recorded hashes, the sanitizers,
-# the TLA+ model and the thread-seam reruns, and fuzzes 50 examples, not 200.
-# The default is the full gate.
+# tests/check-bgen.sh). GATE_TIER=c runs only the checks that compare the C
+# binary against recorded results; Java then only builds the bref3 fixtures.
+# It skips every check that runs Java or the jar alongside it, the sanitizers
+# and the TLA+ model, and it runs the saved fuzz regressions but no new fuzz
+# examples. The default is the full gate. GATE_FUZZ=random fuzzes new examples
+# instead of the fixed 200.
 # shellcheck disable=SC2329  # java_build, oracle_trace and trace_threads run through step
 set -uo pipefail
 cd "$1" || exit 1
@@ -22,9 +24,13 @@ THREAD_SEAMS="T3b0 T3b1 T3b T3c T3d T4a T4b T4c T4d"
 mkdir -p build
 fail=0
 tier=${GATE_TIER:-full}
-case $tier in full|pr) ;; *) echo "GATE_TIER must be full or pr, not $tier"; exit 2 ;; esac
-fuzz_examples=200
-[ "$tier" = pr ] && fuzz_examples=50
+case $tier in full|c) ;; *) echo "GATE_TIER must be full or c, not $tier"; exit 2 ;; esac
+fuzz_args=(--examples 200)
+case ${GATE_FUZZ:-fixed} in
+  fixed) ;;
+  random) fuzz_args+=(--random) ;;
+  *) echo "GATE_FUZZ must be fixed or random, not $GATE_FUZZ"; exit 2 ;;
+esac
 step() {  # name command...
   local name=$1; shift
   if "$@" > "build/check-$name.log" 2>&1; then
@@ -61,14 +67,14 @@ trace_threads() {
 
 step fixtures tests/fetch-fixtures.sh
 step cases python3 tests/check_cases.py
-step jcompat make check-jcompat
+full_step jcompat make check-jcompat
 step tracker make check-tracker
 step interval make check-interval
 full_step oracle-jar tests/check-oracle.sh java -ea -jar data/beagle.27Feb25.75f.jar
 full_step failures-jar tests/check-failures.sh java -ea -jar data/beagle.27Feb25.75f.jar
 full_step java-build java_build
 full_step oracle-source tests/check-oracle.sh java -ea -cp build/classes main.Main
-step java-trace make java-trace
+full_step java-trace make java-trace
 full_step oracle-trace oracle_trace
 step c-build make build/beagle
 step oracle-c tests/check-oracle.sh build/beagle
@@ -80,9 +86,12 @@ step vcf-index make check-vcf-index
 step tbi make check-tbi
 step bgen tests/check-bgen.sh
 # shellcheck disable=SC2086  # the seam list splits into arguments
-step trace tests/check-trace.sh $SEAMS
+full_step trace tests/check-trace.sh $SEAMS
 full_step sanitizers tests/check-sanitizers.sh
 full_step tla tests/check-tla.sh
-step fuzz uv run --python 3.12 --script tests/check_fuzz.py --examples "$fuzz_examples"
+full_step fuzz uv run --python 3.12 --script tests/check_fuzz.py "${fuzz_args[@]}"
+if [ "$tier" = c ]; then
+  step fuzz-regressions uv run --python 3.12 --script tests/check_fuzz.py --examples 0 --invalid-examples 0
+fi
 full_step trace-threads trace_threads
 exit $fail
