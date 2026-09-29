@@ -13,6 +13,8 @@
 
 fast-beagle is a standalone C port of [Beagle 5.5](https://faculty.washington.edu/browning/beagle/beagle.html) (27Feb25), the genotype phasing and imputation tool. Its output is byte-identical to the Java release run with the same `nthreads=`. It adds BGEN v1.2 output and a tabix index written in the same pass as the VCF.
 
+This repository is the Beagle 5.5 edition of fast-beagle. [fast-beagle-5.4](https://github.com/michael-denyer/fast-beagle-5.4) is the Beagle 5.4 (29Oct24) edition. Each edition writes the output of its own Beagle release, and Beagle 5.4 and 5.5 phase differently. Use the edition that matches the Beagle version whose output you need.
+
 ## How it works
 
 Beagle phases each target sample's genotypes into two haplotypes, then imputes the markers the target lacks from a reference panel. It works along the chromosome in overlapping windows. fast-beagle runs the same steps and writes the same output, and can also write BGEN.
@@ -24,10 +26,10 @@ Beagle phases each target sample's genotypes into two haplotypes, then imputes t
 Build fast-beagle from source. It needs a C11 compiler, `make` and htslib.
 
 ```bash
-git clone https://github.com/michael-denyer/fast-beagle.git
+git clone https://github.com/michael-denyer/fast-beagle-5.5.git
 brew install htslib              # macOS
 sudo apt-get install libhts-dev  # Debian and Ubuntu
-make -C fast-beagle
+make -C fast-beagle-5.5
 ```
 
 `make` builds the binary `build/beagle`.
