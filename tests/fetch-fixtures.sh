@@ -278,6 +278,23 @@ edge_header() {
   printf '1\t350\t.\tC\tT\t.\t.\t.\tGT\t0/1\n'
 } | gzip > edge-bref3-target.vcf.gz
 
+# Imputation with err=0 where no reference haplotype carries the target's ALT
+# alleles: every state probability is 0, so Beagle writes the imputed marker at
+# 2000 with AF=NaN.
+{
+  printf '##fileformat=VCFv4.2\n##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n'
+  printf '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tS1\n'
+  printf '20\t1000\t.\tA\tC\t.\tPASS\t.\tGT\t1|1\n'
+  printf '20\t3000\t.\tA\tC\t.\tPASS\t.\tGT\t1|1\n'
+} | gzip > target.nan.vcf.gz
+{
+  printf '##fileformat=VCFv4.2\n##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n'
+  printf '#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tR1\tR2\n'
+  printf '20\t1000\t.\tA\tC\t.\tPASS\t.\tGT\t0|0\t0|0\n'
+  printf '20\t2000\t.\tA\tC\t.\tPASS\t.\tGT\t0|1\t1|0\n'
+  printf '20\t3000\t.\tA\tC\t.\tPASS\t.\tGT\t0|0\t0|0\n'
+} | gzip > ref.nan.vcf.gz
+
 # Paths relative to the checkout let a complete cache move between worktrees.
 # Publish only after every generator and checksum above has succeeded.
 (cd "$ROOT" && shasum -a 256 tests/fetch-fixtures.sh tests/oracle-cases.txt tests/trace-cases.txt tests/bgen-cases.txt \

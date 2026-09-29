@@ -36,18 +36,27 @@ ref_hash=$($SHA "$OUT/ref.vcf.gz" | cut -c1-16)
 mkdir "$OUT/dir"
 
 # Main.parameters and Main.checkOutputPrefix. File.equals compares normalized
-# paths, so a doubled slash still names the input.
-check out-equals-gt "ERROR: VCF output file equals input file" gt="$OUT/in.vcf.gz" out="$OUT/in"
+# paths, so a doubled slash still names the input, and the message prints the
+# input's normalized path.
+norm=$(tr -s / <<< "$OUT")
+check out-equals-gt "ERROR: VCF output file equals input file: $norm/in.vcf.gz" gt="$OUT/in.vcf.gz" out="$OUT/in"
 unchanged out-equals-gt "$OUT/in.vcf.gz" "$in_hash"
-check out-equals-gt-slashes "ERROR: VCF output file equals input file" gt="$OUT/in.vcf.gz" out="$OUT//in"
+check out-equals-gt-slashes "ERROR: VCF output file equals input file: $norm/in.vcf.gz" gt="$OUT/in.vcf.gz" out="$OUT//in"
 unchanged out-equals-gt-slashes "$OUT/in.vcf.gz" "$in_hash"
-check out-equals-ref "ERROR: VCF output file equals input file" ref="$OUT/ref.vcf.gz" gt="$DATA/target.thin.vcf.gz" out="$OUT/ref"
+check gt-slashes "ERROR: VCF output file equals input file: $norm/in.vcf.gz" gt="$OUT//in.vcf.gz" out="$OUT/in"
+unchanged gt-slashes "$OUT/in.vcf.gz" "$in_hash"
+check out-equals-ref "ERROR: VCF output file equals input file: $norm/ref.vcf.gz" \
+  ref="$OUT/ref.vcf.gz" gt="$DATA/target.thin.vcf.gz" out="$OUT/ref"
 unchanged out-equals-ref "$OUT/ref.vcf.gz" "$ref_hash"
 ABSENT="$OUT/dir.vcf.gz" check out-directory "ERROR: \"out\" parameter cannot be a directory" \
   gt="$DATA/target.vcf.gz" out="$OUT/dir"
 ABSENT="$OUT/window.vcf.gz" check window-overlap \
   "ERROR: The \"window\" parameter must be at least 1.1 times the \"overlap\" parameter" \
   gt="$DATA/target.vcf.gz" out="$OUT/window" window=1 overlap=1
+# A window shorter than the marker spacing holds no marker, and BasicGT
+# indexes the empty marker array.
+check empty-window "java.lang.ArrayIndexOutOfBoundsException: Index 0 out of bounds for length 0" \
+  gt="$DATA/target.thin.vcf.gz" window=0.0000001 overlap=0.00000001 out="$OUT/empty-window"
 
 # VcfRecGTParser reads a one-character allele as c - '0' and longer ones with
 # Integer.parseInt, so a lone Arabic-Indic one (U+0661) is allele 1585.

@@ -1,6 +1,6 @@
 # Byte identity with Beagle 5.5
 
-fast-beagle writes the same VCF text as the Java release of Beagle 5.5, `beagle.27Feb25.75f.jar`, when both run with the same arguments, seed and `nthreads=`. The gate proves this on 34 recorded cases at 1, 2 and 18 threads, and compares 20 intermediate trace seams with an instrumented copy of the Java source. It also runs 200 generated inputs and 84 invalid-parameter inputs through both tools. It checks the Java library functions that Beagle calls against a real JVM, and runs every check on macOS arm64 and on Linux x86_64. The proof covers the tested inputs, parameters, thread counts and platforms. The [limits](#limits) section lists what it does not cover.
+fast-beagle writes the same VCF text as the Java release of Beagle 5.5, `beagle.27Feb25.75f.jar`, when both run with the same arguments, seed and `nthreads=`. The gate proves this on 35 recorded cases at 1, 2 and 18 threads, and compares 20 intermediate trace seams with an instrumented copy of the Java source. It also runs 200 generated inputs and 84 invalid-parameter inputs through both tools. It checks the Java library functions that Beagle calls against a real JVM, and runs every check on macOS arm64 and on Linux x86_64. The proof covers the tested inputs, parameters, thread counts and platforms. The [limits](#limits) section lists what it does not cover.
 
 ## What byte-identical means
 
@@ -16,20 +16,20 @@ Each check below runs in the pre-merge gate, `tests/gate-steps.sh`, except the c
 
 | Evidence | What it checks | Scale | Rerun with |
 |---|---|---|---|
-| [Oracle hashes](#oracle-hashes) | The VCF hash of each case against the hash that the jar writes | 34 cases, each at 1, 2 and 18 threads, for the jar, a build of the Java source, the Java trace build and fast-beagle | `tests/check-oracle.sh build/beagle` |
-| [Trace seams](#trace-seams) | Intermediate values at 20 points in the pipeline, against an instrumented Java build | 41 cases at 2 threads, and 9 seams again at 1 and 18 threads on the 2 thread-dependent cases | `tests/check-trace.sh T1a T1b ... T5d` |
+| [Oracle hashes](#oracle-hashes) | The VCF hash of each case against the hash that the jar writes | 35 cases, each at 1, 2 and 18 threads, for the jar, a build of the Java source, the Java trace build and fast-beagle | `tests/check-oracle.sh build/beagle` |
+| [Trace seams](#trace-seams) | Intermediate values at 20 points in the pipeline, against an instrumented Java build | 42 cases at 2 threads, and 9 seams again at 1 and 18 threads on the 2 thread-dependent cases | `tests/check-trace.sh T1a T1b ... T5d` |
 | [Differential fuzzing](#differential-fuzzing) | Generated inputs and options run through the jar and fast-beagle | 200 examples at 1, 2, 3 or 5 threads, plus 2 examples for each of 42 invalid-parameter changes, plus 1 saved regression | `uv run --python 3.12 --script tests/check_fuzz.py --examples 200` |
-| [Refused inputs](#refused-inputs) | Inputs that Beagle rejects, with the exit code and Java's message | 17 cases for fast-beagle, 16 of them also on the jar | `tests/check-failures.sh build/beagle` |
+| [Refused inputs](#refused-inputs) | Inputs that Beagle rejects, with the exit code and Java's message | 19 cases for fast-beagle, 18 of them also on the jar, and 49 fast-beagle-only output collision checks | `tests/check-failures.sh build/beagle` |
 | [Java library fixtures](#java-library-fixtures) | C reproductions of the Java library behaviour that Beagle depends on, against a real JVM | 8 fixture sets | `make check-jcompat` |
-| [Thread safety and ordering](#thread-safety-and-ordering) | Memory errors, undefined behaviour and data races on the oracle cases, the ordered writer protocol, and the imputation work-item size | Sanitizers on 34 cases, TLC on 8 model sizes, piece size on 19 cases at 2 and 18 threads | `tests/check-sanitizers.sh`, `tests/check-tla.sh`, `make check-piece-size` |
+| [Thread safety and ordering](#thread-safety-and-ordering) | Memory errors, undefined behaviour and data races on the oracle cases, the ordered writer protocol, and the imputation work-item size | Sanitizers on 35 cases, TLC on 8 model sizes, piece size on 20 cases at 2 and 18 threads | `tests/check-sanitizers.sh`, `tests/check-tla.sh`, `make check-piece-size` |
 | [Platforms](#platforms) | The whole gate on two operating systems and two CPU architectures | macOS arm64 and Linux x86_64 | `tests/check-local.sh` |
 | [chr20 benchmark](#chr20-benchmark) | A realistic imputation run, outside the gate | 1000 Genomes chr20, 6 runs per tool at 18 threads | `tests/bench/bench.sh <dir> 3` |
 
 ### Oracle hashes
 
-`tests/oracle-cases.txt` has 34 cases. They run on Beagle's public test data, `test.beagle.vcf.gz`: 1,356 markers and 191 samples in 100 kb of chromosome 22. `tests/fetch-fixtures.sh` downloads it with the jar, checks both against SHA-256 checksums, and derives the fixtures. The cases cover phasing only, imputation, a VCF and a bref3 reference, chrX with haploid samples, multiallelic markers, missing genotypes, exclusion lists, a `chrom=` interval, genetic maps, `ap=` and `gp=`, and the state and segment limits. [Fixtures](testing.md#fixtures) lists them.
+`tests/oracle-cases.txt` has 35 cases. All but one run on Beagle's public test data, `test.beagle.vcf.gz`: 1,356 markers and 191 samples in 100 kb of chromosome 22. `tests/fetch-fixtures.sh` downloads it with the jar, checks both against SHA-256 checksums, and derives the fixtures. The cases cover phasing only, imputation, a VCF and a bref3 reference, chrX with haploid samples, multiallelic markers, missing genotypes, exclusion lists, a `chrom=` interval, genetic maps, `ap=` and `gp=`, and the state and segment limits. The other case, `imp-nan`, imputes with `err=0` from a 3-marker, 2-sample reference and writes `AF=NaN`. [Fixtures](testing.md#fixtures) lists them.
 
-`tests/check-oracle.sh` runs each case at 1, 2 and 18 threads, 102 runs per implementation, with `seed=-99999`. Two cases, `gt-ibs2` and `gt-ibs2-miss`, use a steep genetic map with windows longer than 4 cM. They record one hash per thread count. The other 32 cases record one hash for all three thread counts.
+`tests/check-oracle.sh` runs each case at 1, 2 and 18 threads, 105 runs per implementation, with `seed=-99999`. Two cases, `gt-ibs2` and `gt-ibs2-miss`, use a steep genetic map with windows longer than 4 cM. They record one hash per thread count. The other 33 cases record one hash for all three thread counts.
 
 The gate runs `tests/check-oracle.sh` four times, once for each of these implementations:
 
@@ -46,7 +46,7 @@ A matching final hash can hide two errors that cancel. The trace seams compare t
 
 The 20 seams are `T1a T1b T1c T1d T2 T2b T3a T3b0 T3b1 T3b T3c T3d T4a T4b T4c T4d T5a T5b T5c T5d`. They cover input records and samples (T1), windows and fixed phasing data (T2), stage-1 phasing (T3), stage-2 phasing (T4) and imputation (T5). Seams that hold floating-point values print them as raw bits. Seams over large state print an FNV-1a digest of it.
 
-`tests/check-trace.sh` runs both builds at 2 threads on the 34 oracle cases and the 7 input edge cases in `tests/trace-cases.txt`, 41 cases in all. The 7 extra cases cover CRLF line ends, Latin-1 bytes, a missing final newline, 600 markers 10 bp apart, a bref3 edge case, and two runs that both tools refuse. The script compares each seam file with `cmp`. It also requires the same exit code per case and fails if fast-beagle writes a seam file that Java does not. The gate then runs the 9 thread-dependent seams, `T3b0 T3b1 T3b T3c T3d T4a T4b T4c T4d`, again at 1 and 18 threads on `gt-ibs2` and `gt-ibs2-miss`.
+`tests/check-trace.sh` runs both builds at 2 threads on the 35 oracle cases and the 7 input edge cases in `tests/trace-cases.txt`, 42 cases in all. The 7 extra cases cover CRLF line ends, Latin-1 bytes, a missing final newline, 600 markers 10 bp apart, a bref3 edge case, and two runs that both tools refuse. The script compares each seam file with `cmp`. It also requires the same exit code per case and fails if fast-beagle writes a seam file that Java does not. The gate then runs the 9 thread-dependent seams, `T3b0 T3b1 T3b T3c T3d T4a T4b T4c T4d`, again at 1 and 18 threads on `gt-ibs2` and `gt-ibs2-miss`.
 
 ### Differential fuzzing
 
@@ -60,9 +60,10 @@ The full gate runs a fixed set of 200 examples and 2 examples per invalid-parame
 
 ### Refused inputs
 
-`tests/check-failures.sh` runs inputs that Beagle rejects at 2 threads. Each run must exit 1 and print the same message that the jar prints, and must write no output. The 17 cases are:
+`tests/check-failures.sh` runs inputs that Beagle rejects at 2 threads. Each run must exit 1 and print the same message that the jar prints, and must write no output. The 19 cases are:
 
-- 5 parameter errors: `out=` equal to the `gt=` file (twice, once with a doubled slash), `out=` equal to the `ref=` file, `out=` naming a directory, and `window` less than 1.1 times `overlap`
+- 6 parameter errors: `out=` equal to the `gt=` file (three times: as given, with a doubled slash in `out=`, and with a doubled slash in `gt=`), `out=` equal to the `ref=` file, `out=` naming a directory, and `window` less than 1.1 times `overlap`. The `out=` messages must name the input by its normalized path, as `java.io.File` prints it.
+- a `window` shorter than the marker spacing, which leaves a window with no marker
 - 8 genetic map errors
 - a one-character non-ASCII GT allele
 - a bref3 SNV allele code with a negative permutation index
@@ -71,13 +72,15 @@ The full gate runs a fixed set of 200 examples and 2 examples per invalid-parame
 
 The gate runs the script on the jar and on fast-beagle. The bref3 sample-count case runs for fast-beagle only, because the jar's result depends on its heap size.
 
+On fast-beagle only, the script also runs 49 checks of the [output collision refusal](beagle-divergences.md#errors-and-exit-status), which Beagle does not have. In 48 runs an output is an existing input file: through `./`, `..`, a relative path, a symlink, a hard link and a directory symlink, and each output file against each input file parameter. Each run must print the `fast-beagle:` message, leave the input unchanged and write no file. The 49th run names an input like an output that is not enabled, and must succeed.
+
 ### Java library fixtures
 
 Beagle's output depends on the exact behaviour of Java library code. `src/jcompat/` reproduces that code in C. `make check-jcompat` compiles `tests/jcompat/JcompatFixtures.java`, runs it on the JVM, and requires each C fixture to print the same text. The 8 fixture sets are:
 
 - `random`: `java.util.Random` sequences for 10 seeds and 14 bounds
 - `math`: `StrictMath.log`, `log10`, `pow` and `expm1` from the fdlibm 5.3 port, on special values and 20,000 random inputs, and each Beagle call site of `Math.log`, `Math.log10`, `Math.pow` and `Math.expm1` evaluated as Beagle evaluates it
-- `numbers`: `Math.round` edges, `double` and `float` casts to `int` and `long`, `DecimalFormat` patterns, `Double.toString` and `Float.toString`
+- `numbers`: `Math.round` edges, `double` and `float` casts to `int` and `long`, `DecimalFormat` patterns including NaN and the infinities, `Double.toString` and `Float.toString`
 - `parse`: `Double.parseDouble`
 - `parseint`: `Integer.parseInt`, including digits in other scripts
 - `utf8`: Java's UTF-8 decoding of byte strings
@@ -90,7 +93,7 @@ Beagle's output depends on the exact behaviour of Java library code. `src/jcompa
 
 `tests/check-tla.sh` model-checks [tla/ParallelOrdered.tla](../tla/ParallelOrdered.tla), the protocol of the pipelined imputed writer in `src/blbutil/parallel.c`. Workers build records in parallel, and the calling thread writes them in order. TLC checks 8 model sizes, from 1 worker and 3 items to 4 workers and 8 items, with windows of 1 to 5. It checks that items are consumed in order, that no slot is overwritten before it is consumed, that there is no deadlock, and that every run consumes every item. The model includes spurious wakeups, so a lost wakeup fails the check.
 
-`make check-piece-size` builds a second binary that splits long imputation clusters into work items of one marker, not 500. It runs both binaries on the 19 oracle cases with `ref=` at 2 and 18 threads. Both must write the same VCF and the same trace seam T5d. The work-item size is a tuning value, and the check proves it does not change the output.
+`make check-piece-size` builds a second binary that splits long imputation clusters into work items of one marker, not 500. It runs both binaries on the 20 oracle cases with `ref=` at 2 and 18 threads. Both must write the same VCF and the same trace seam T5d. The work-item size is a tuning value, and the check proves it does not change the output.
 
 ### Platforms
 
