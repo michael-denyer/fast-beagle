@@ -37,6 +37,7 @@ jobs:
       run: ${{ steps.plan.outputs.run }}
       tier: ${{ steps.plan.outputs.tier }}
       fuzz: ${{ steps.plan.outputs.fuzz }}
+      groups: ${{ steps.plan.outputs.groups }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -62,8 +63,11 @@ jobs:
                 --jq '.workflow_runs[0].head_sha // ""')
               if [ "$last" = "$SHA" ]; then run=false; fi ;;
           esac
-          echo "run=$run tier=$tier fuzz=$fuzz"
-          { echo "run=$run"; echo "tier=$tier"; echo "fuzz=$fuzz"; } >> "$GITHUB_OUTPUT"
+          # Every check in the java group is full-tier only.
+          groups='["core","bgen","java","sanitizers"]'
+          if [ "$tier" = c ]; then groups='["core","bgen","sanitizers"]'; fi
+          echo "run=$run tier=$tier fuzz=$fuzz groups=$groups"
+          { echo "run=$run"; echo "tier=$tier"; echo "fuzz=$fuzz"; echo "groups=$groups"; } >> "$GITHUB_OUTPUT"
 
   # One job per runner and check group of tests/gate-steps.sh; the setup
   # checks (the fixtures and the C build) run in every job.
@@ -76,7 +80,7 @@ jobs:
       fail-fast: false
       matrix:
         runner: [macos-latest, ubuntu-latest]
-        group: [core, bgen, java, sanitizers]
+        group: ${{ fromJSON(needs.plan.outputs.groups) }}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
