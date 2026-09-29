@@ -39,18 +39,22 @@ mask() {  # log
 check_selection "$ROOT/tests/oracle-cases.txt" || exit 1
 if [ -n "${RECORD:-}" ]; then
   [ -z "${CASES:-}" ] || { echo "FAIL RECORD=1 needs every case"; exit 1; }
-  rm -rf "$LOGS" && mkdir "$LOGS"
+  mkdir "$OUT/logs" || exit 1
 fi
 fail=0
-while read -r name _ _ args; do
+while read -r name expect _ args; do
   selected "$name" || continue
   out="$OUT/$name"
-  case_run "$args" "$out" 2 "${BEAGLE[@]}"
-  if [ ! -s "$out.log" ]; then
+  if ! case_verdict "$expect" "$args" "$out" 2 "${BEAGLE[@]}"; then
+    echo "FAIL $name: $VERDICT"; tail -3 "$out.run.log"; fail=1
+  elif [ ! -s "$out.log" ]; then
     echo "FAIL $name: no log"; tail -3 "$out.run.log"; fail=1
   elif [ -n "${RECORD:-}" ]; then
-    mask "$out.log" > "$LOGS/$name.log"
-    echo "PASS $name recorded $(wc -l < "$out.log" | tr -d ' ') lines"
+    if mask "$out.log" > "$OUT/logs/$name.log"; then
+      echo "PASS $name recorded $(wc -l < "$out.log" | tr -d ' ') lines"
+    else
+      echo "FAIL $name: could not mask the log"; fail=1
+    fi
   elif [ "$1" != java ] && ! cmp -s "$out.log" "$out.run.log"; then
     echo "FAIL $name: standard output differs from the log"
     diff "$out.log" "$out.run.log" | head -10; fail=1
@@ -77,5 +81,8 @@ if [ "$1" != java ] && [ -z "${CASES:-}" ]; then
   check_bad_ref bad-ref "$OUT/junk.vcf.gz"
   gzip -dc "$DATA/ref.vcf.gz" | awk 'BEGIN {OFS = "\t"} /^#/ {print; next} {$NF = "7|7"; print}' | gzip > "$OUT/bad-alleles.ref.vcf.gz"
   check_bad_ref bad-alleles "$OUT/bad-alleles.ref.vcf.gz"
+fi
+if [ -n "${RECORD:-}" ] && [ "$fail" -eq 0 ]; then
+  rm -rf "$LOGS" && cp -R "$OUT/logs" "$LOGS" || fail=1
 fi
 exit $fail
