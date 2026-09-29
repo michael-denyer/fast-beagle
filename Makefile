@@ -1,15 +1,19 @@
 CC ?= cc
 CFLAGS ?= -O2 -g
+# Package builds set WERROR= so that a newer compiler's warnings cannot stop them.
+WERROR ?= -Werror
 # Part of correctness, not tuning: see the plan's Architecture section.
-override CFLAGS += -std=c11 -Wall -Wextra -Werror -ffp-contract=off -fno-fast-math -fwrapv -Isrc -Ithird_party/libdeflate
+override CFLAGS += -std=c11 -Wall -Wextra $(WERROR) -ffp-contract=off -fno-fast-math -fwrapv -Isrc -Ithird_party/libdeflate
 # fdlibm is kept as upstream wrote it; these warnings flag its style, not bugs.
 FDLIBM_CFLAGS := -Wno-dangling-else -Wno-sign-compare
 # libdeflate 1.25 as plink2 vendors it (bgen=plink2 must compress as plink2 does), built with its own flags.
 LIBDEFLATE_CFLAGS := -O2
 JAVA ?= java
 JAVAC ?= javac
+PREFIX ?= /usr/local
 LDLIBS += -lm -pthread
 # htslib from Homebrew on macOS; on Linux the system package needs no flags.
+# HTSLIB_PREFIX=<dir> uses the htslib in <dir> instead, as the conda build does.
 HTSLIB_PREFIX ?= $(shell brew --prefix htslib 2>/dev/null)
 ifneq ($(HTSLIB_PREFIX),)
 override CFLAGS += -I$(HTSLIB_PREFIX)/include
@@ -22,13 +26,18 @@ JCOMPAT_FIXTURES := random math numbers utf8 parse parseint pqueue search
 LIBDEFLATE_OBJ := $(patsubst %.c,build/obj/%.o,$(wildcard third_party/libdeflate/lib/*.c third_party/libdeflate/lib/*/*.c))
 BEAGLE_OBJ := $(sort $(patsubst src/%.c,build/obj/%.o,$(wildcard src/*/*.c)) $(JCOMPAT_OBJ) $(LIBDEFLATE_OBJ))
 
-.PHONY: all check-jcompat check-bgen-unit check-records check-vcf-index check-tbi check-tracker check-interval check-block-reader check-piece-size java-trace clean
+.PHONY: all install check-jcompat check-bgen-unit check-records check-vcf-index check-tbi check-tracker check-interval check-block-reader check-piece-size java-trace clean
 .SECONDARY:
 .DELETE_ON_ERROR:
 all: build/beagle
 
 build/beagle: $(BEAGLE_OBJ)
 	$(LINK)
+
+# Installs build/beagle as fast-beagle, since Beagle's own packages install beagle.
+install: build/beagle
+	install -d $(DESTDIR)$(PREFIX)/bin
+	install -m 755 build/beagle $(DESTDIR)$(PREFIX)/bin/fast-beagle
 
 check-jcompat: $(JCOMPAT_FIXTURES:%=build/jcompat/%.diff)
 
