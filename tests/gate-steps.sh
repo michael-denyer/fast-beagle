@@ -10,7 +10,7 @@
 # pinned plink2 binary (see tests/check-bgen.sh). GATE_TIER=c runs only the checks that compare the C
 # binary against recorded results; Java then only builds the bref3 fixtures.
 # It skips every check that runs Java or the jar alongside it, the
-# fixture-cache check, the sanitizers and the TLA+ model. It checks the
+# fixture-cache check and the TLA+ model. It checks the
 # BGEN output against the hashes in tests/bgen-hashes.txt instead of
 # plink2, and runs the saved fuzz regressions but no new fuzz
 # examples. The default is the full gate. GATE_FUZZ=random fuzzes new examples
@@ -111,7 +111,7 @@ step core tbi make check-tbi
 step bgen bgen env BGEN_ORACLE="$bgen_oracle" tests/check-bgen.sh
 # shellcheck disable=SC2086  # the seam list splits into arguments
 full_step java trace tests/check-trace.sh $SEAMS
-full_step sanitizers sanitizers tests/check-sanitizers.sh
+step sanitizers sanitizers tests/check-sanitizers.sh
 full_step core tla tests/check-tla.sh
 full_step core fuzz uv run --python 3.12 --script tests/check_fuzz.py "${fuzz_args[@]}"
 if [ "$tier" = c ]; then
