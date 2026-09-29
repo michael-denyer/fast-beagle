@@ -63,14 +63,17 @@ jobs:
                 --jq '.workflow_runs[0].head_sha // ""')
               if [ "$last" = "$SHA" ]; then run=false; fi ;;
           esac
-          # Every check in the java group is full-tier only.
-          groups='["core","bgen","java","sanitizers"]'
-          if [ "$tier" = c ]; then groups='["core","bgen","sanitizers"]'; fi
+          # Every check in the java and cases groups is full-tier only.
+          groups='["core","bgen","java","cases","sanitizers","tsan"]'
+          if [ "$tier" = c ]; then groups='["core","bgen","sanitizers","tsan"]'; fi
           echo "run=$run tier=$tier fuzz=$fuzz groups=$groups"
           { echo "run=$run"; echo "tier=$tier"; echo "fuzz=$fuzz"; echo "groups=$groups"; } >> "$GITHUB_OUTPUT"
 
   # One job per runner and check group of tests/gate-steps.sh; the setup
-  # checks (the fixtures and the C build) run in every job.
+  # checks (the fixtures and the C build) run in every job. The cases check
+  # tests shell logic that behaves the same on both runners but takes minutes
+  # longer on macOS, so it runs on Linux only. ThreadSanitizer runs on macOS
+  # only (see tests/check-tsan.sh).
   check:
     name: check (${{ matrix.runner }}, ${{ matrix.group }})
     needs: plan
@@ -81,6 +84,11 @@ jobs:
       matrix:
         runner: [macos-latest, ubuntu-latest]
         group: ${{ fromJSON(needs.plan.outputs.groups) }}
+        exclude:
+          - runner: macos-latest
+            group: cases
+          - runner: ubuntu-latest
+            group: tsan
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1

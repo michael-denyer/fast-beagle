@@ -21,7 +21,7 @@ Each check below runs in the pre-merge gate, `tests/gate-steps.sh`, except the c
 | [Differential fuzzing](#differential-fuzzing) | Generated inputs and options run through the jar and fast-beagle | 200 examples at 1, 2, 3 or 5 threads, plus 2 examples for each of 42 invalid-parameter changes, plus 1 saved regression | `uv run --python 3.12 --script tests/check_fuzz.py --examples 200` |
 | [Refused inputs](#refused-inputs) | Inputs that Beagle rejects, with the exit code and Java's message | 19 cases for fast-beagle, 18 of them also on the jar, and 49 fast-beagle-only output collision checks | `tests/check-failures.sh build/beagle` |
 | [Java library fixtures](#java-library-fixtures) | C reproductions of the Java library behaviour that Beagle depends on, against a real JVM | 8 fixture sets | `make check-jcompat` |
-| [Thread safety and ordering](#thread-safety-and-ordering) | Memory errors, undefined behaviour and data races on the oracle cases, the ordered writer protocol, and the imputation work-item size | Sanitizers on 35 cases, TLC on 8 model sizes, piece size on 20 cases at 2 and 18 threads | `tests/check-sanitizers.sh`, `tests/check-tla.sh`, `make check-piece-size` |
+| [Thread safety and ordering](#thread-safety-and-ordering) | Memory errors, undefined behaviour and data races on the oracle cases, the ordered writer protocol, and the imputation work-item size | Sanitizers on 35 cases, TLC on 8 model sizes, piece size on 20 cases at 2 and 18 threads | `tests/check-sanitizers.sh`, `tests/check-tsan.sh`, `tests/check-tla.sh`, `make check-piece-size` |
 | [Platforms](#platforms) | The whole gate on two operating systems and two CPU architectures | macOS arm64 and Linux x86_64 | `tests/check-local.sh` |
 | [chr20 benchmark](#chr20-benchmark) | A realistic imputation run, outside the gate | 1000 Genomes chr20, 6 runs per tool at 18 threads | `tests/bench/bench.sh <dir> 3` |
 
@@ -89,7 +89,7 @@ Beagle's output depends on the exact behaviour of Java library code. `src/jcompa
 
 ### Thread safety and ordering
 
-`tests/check-sanitizers.sh` builds fast-beagle and the unit tests with AddressSanitizer and UndefinedBehaviorSanitizer at `-O1`. It runs every oracle case at 1 and 2 threads, as VCF only, with `bgen=plink2` and with `bgen=phased`. Each run must exit 0 with the oracle hash and no sanitizer report. The `bgen=plink2` runs skip the 3 cases on non-autosomes. On Linux, LeakSanitizer also runs. On macOS, the script builds fast-beagle with ThreadSanitizer and runs every oracle case at 18 threads, and the 2 thread-dependent cases again with tracing on.
+`tests/check-sanitizers.sh` builds fast-beagle and the unit tests with AddressSanitizer and UndefinedBehaviorSanitizer at `-O1`. It runs every oracle case at 1 and 2 threads, as VCF only, with `bgen=plink2` and with `bgen=phased`. Each run must exit 0 with the oracle hash and no sanitizer report. The `bgen=plink2` runs skip the 3 cases on non-autosomes. On Linux, LeakSanitizer also runs. On macOS, `tests/check-tsan.sh` builds fast-beagle with ThreadSanitizer and runs every oracle case at 18 threads, and the 2 thread-dependent cases again with tracing on.
 
 `tests/check-tla.sh` model-checks [tla/ParallelOrdered.tla](../tla/ParallelOrdered.tla), the protocol of the pipelined imputed writer in `src/blbutil/parallel.c`. Workers build records in parallel, and the calling thread writes them in order. TLC checks 8 model sizes, from 1 worker and 3 items to 4 workers and 8 items, with windows of 1 to 5. It checks that items are consumed in order, that no slot is overwritten before it is consumed, that there is no deadlock, and that every run consumes every item. The model includes spurious wakeups, so a lost wakeup fails the check.
 
@@ -159,6 +159,7 @@ tests/check-failures.sh build/beagle
 uv run --python 3.12 --script tests/check_fuzz.py --examples 200
 make check-jcompat check-piece-size
 tests/check-sanitizers.sh
+tests/check-tsan.sh        # macOS only
 tests/check-tla.sh
 ```
 
