@@ -93,6 +93,7 @@ full_step core cases python3 tests/check_cases.py
 full_step core jcompat make check-jcompat
 step core tracker make check-tracker
 step core interval make check-interval
+step core block-reader make check-block-reader
 full_step java oracle-jar tests/check-oracle.sh java -ea -jar data/beagle.27Feb25.75f.jar
 full_step java failures-jar tests/check-failures.sh java -ea -jar data/beagle.27Feb25.75f.jar
 full_step java log-jar tests/check-log.sh java -ea -jar data/beagle.27Feb25.75f.jar
