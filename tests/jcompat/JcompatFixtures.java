@@ -67,6 +67,13 @@ public class JcompatFixtures {
             sb.append("sci1 ").append(d(x)).append(' ')
                     .append(String.format(java.util.Locale.US, "%1$7.1e", x)).append('\n');
         }
+        // DecimalFormat's spelling of NaN, a negative NaN, the infinities and -0.0.
+        for (double x : new double[] {Double.NaN, Double.longBitsToDouble(0xfff8000000000000L),
+                Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, -0.0}) {
+            sb.append("hash2 ").append(d(x)).append(' ').append(hash2.format(x)).append('\n');
+            sb.append("fixed2 ").append(d(x)).append(' ').append(fixed2.format(x)).append('\n');
+            sb.append("fixed4 ").append(d(x)).append(' ').append(fixed4.format(x)).append('\n');
+        }
         // Double.toString: specials, every power of two and ten and their
         // neighbours, the plain/scientific boundaries, and random values.
         java.util.List<Double> printed = new java.util.ArrayList<>(xs);

@@ -78,7 +78,7 @@ Beagle's output depends on the exact behaviour of Java library code. `src/jcompa
 
 - `random`: `java.util.Random` sequences for 10 seeds and 14 bounds
 - `math`: `StrictMath.log`, `log10`, `pow` and `expm1` from the fdlibm 5.3 port, on special values and 20,000 random inputs, and each Beagle call site of `Math.log`, `Math.log10`, `Math.pow` and `Math.expm1` evaluated as Beagle evaluates it
-- `numbers`: `Math.round` edges, `double` and `float` casts to `int` and `long`, `DecimalFormat` patterns, `Double.toString` and `Float.toString`
+- `numbers`: `Math.round` edges, `double` and `float` casts to `int` and `long`, `DecimalFormat` patterns including NaN and the infinities, `Double.toString` and `Float.toString`
 - `parse`: `Double.parseDouble`
 - `parseint`: `Integer.parseInt`, including digits in other scripts
 - `utf8`: Java's UTF-8 decoding of byte strings
