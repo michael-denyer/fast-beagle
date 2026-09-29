@@ -1,7 +1,8 @@
 #!/bin/bash
 # Checks tests/gate-tier.sh on changed-path lists with known tiers, including a
-# new test script, which must run the full tier without an entry of its own,
-# and an empty list, which must fail rather than pick a tier.
+# documentation-only list, which must run no tier, a new test script, which
+# must run the full tier without an entry of its own, and an empty list, which
+# must fail rather than pick a tier.
 #
 # Usage: tests/check-gate-tier.sh
 set -uo pipefail
@@ -20,7 +21,10 @@ expect() {  # tier paths...
 
 expect c src/phase/phase_ls.c
 expect c src/main/run_stats.c src/vcf/sliding_window.h
-expect c docs/usage.md README.md
+expect none docs/usage.md README.md
+expect none docs/logo.jpg
+expect none docs/how-it-works.webp images/diagram.svg LICENSE
+expect c src/phase/phase_ls.c docs/usage.md README.md
 expect c third_party/libdeflate/lib/utils.c
 expect full src/jcompat/jnum.c
 expect full tests/check-log.sh
@@ -31,6 +35,7 @@ expect full Makefile
 expect full java/trace.patch
 expect full tla/ParallelOrdered.tla
 expect full .github/workflows/gate.yml
+expect full docs/testing.md tests/gate-steps.sh
 
 if "$ROOT/tests/gate-tier.sh" < /dev/null > /dev/null 2>&1; then
   echo "FAIL an empty path list picked a tier"; fail=1

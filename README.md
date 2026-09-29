@@ -1,6 +1,4 @@
-# fast-beagle
-
-<p align="center"><img src="docs/logo.jpg" width="240" alt="Beagle with a DNA helix"></p>
+# Fast Beagle v5.5
 
 ![C11](https://img.shields.io/badge/C-C11-00599C?logo=c&logoColor=white)
 ![Python test scripts](https://img.shields.io/badge/Python-test_scripts-3776AB?logo=python&logoColor=white)
@@ -9,9 +7,13 @@
 ![Linux](https://img.shields.io/badge/Linux-supported-FCC624?logo=linux&logoColor=black)
 ![License GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)
 
+<img src="docs/logo.jpg" width="144" align="right" alt="Beagle with a DNA helix">
+
 **1.5× to over 3× faster, with over 2× less CPU time and up to 3.5× less memory than Java Beagle 5.5**, and byte-identical output. The gain grows with scale, from a 321-sample public benchmark to a production imputation of about 100,000 samples. [Performance](docs/perf-baseline.md) has both runs.
 
 fast-beagle is a standalone C port of [Beagle 5.5](https://faculty.washington.edu/browning/beagle/beagle.html) (27Feb25), the genotype phasing and imputation tool. Its output is byte-identical to the Java release run with the same `nthreads=`. It adds BGEN v1.2 output and a tabix index written in the same pass as the VCF.
+
+This repository is the Beagle 5.5 edition of fast-beagle. [fast-beagle-5.4](https://github.com/michael-denyer/fast-beagle-5.4) is the Beagle 5.4 (29Oct24) edition. Each edition writes the output of its own Beagle release, and Beagle 5.4 and 5.5 phase differently. Use the edition that matches the Beagle version whose output you need.
 
 ## How it works
 
@@ -24,10 +26,10 @@ Beagle phases each target sample's genotypes into two haplotypes, then imputes t
 Build fast-beagle from source. It needs a C11 compiler, `make` and htslib.
 
 ```bash
-git clone https://github.com/michael-denyer/fast-beagle.git
+git clone https://github.com/michael-denyer/fast-beagle-5.5.git
 brew install htslib              # macOS
 sudo apt-get install libhts-dev  # Debian and Ubuntu
-make -C fast-beagle
+make -C fast-beagle-5.5
 ```
 
 `make` builds the binary `build/beagle`.
