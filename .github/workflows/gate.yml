@@ -115,6 +115,10 @@ jobs:
       - name: Tail of every check log
         if: failure()
         run: tail -n 40 build/check-*.log
+      # A failure above the tail, such as a sanitizer report, shows only here.
+      - name: Context of every FAIL line
+        if: failure()
+        run: grep -B 40 -A 5 '^FAIL' build/check-*.log | head -n 2000 || true
       - name: Keep the shrunk fuzz failure
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
