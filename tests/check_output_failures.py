@@ -11,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 BEAGLE = Path(sys.argv.pop(1)).resolve() if len(sys.argv) > 1 else ROOT / "build/beagle"
+PROGRAM = "fast-beagle"
 OPTIONAL_SUFFIXES = (".bgen", ".info", ".sample", ".vcf.gz.tbi")
 SUFFIXES = (".vcf.gz", ".log", *OPTIONAL_SUFFIXES)
 VCF = (
@@ -67,7 +68,11 @@ class OutputFailures(unittest.TestCase):
                 args["bgen"] = mode
             proc = run(args)
             self.assertEqual(proc.returncode, 1, proc.stderr)
-            self.assertIn("output file equals input file", proc.stderr)
+            # Beagle refuses only a VCF path that equals the gt= or ref= path.
+            if suffix == ".vcf.gz" and field in ("gt", "ref") and alias == "direct":
+                self.assertIn(f"ERROR: VCF output file equals input file: {source}", proc.stderr)
+            else:
+                self.assertIn(f"{PROGRAM}: output file {prefix}{suffix} equals input file ", proc.stderr)
             self.assertEqual(source.read_bytes(), contents, "input was overwritten")
             if alias == "symlink":
                 self.assertTrue(dest.is_symlink(), "input link was removed")
@@ -134,7 +139,7 @@ class OutputFailures(unittest.TestCase):
                 }
             )
             self.assertEqual(proc.returncode, 1, proc.stderr)
-            self.assertIn("non-finite allele probability", proc.stderr)
+            self.assertIn(f"{PROGRAM}: bgen=phased: cannot encode a non-finite allele probability", proc.stderr)
             self.assertNotIn("runtime error:", proc.stderr)
             self.assertNotIn("Sanitizer", proc.stderr)
             for suffix in (".bgen", ".info", ".sample"):

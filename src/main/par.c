@@ -151,7 +151,9 @@ static char *file_path(char *s) {
 }
 
 /* Check log, VCF, BGEN and tabix destinations before their writers open files.
- * stat also detects aliases through relative paths, symlinks and hard links. */
+ * Main.checkOutputPrefix compares only the VCF path with ref=, then gt=; every
+ * other collision is fast-beagle's. stat also detects aliases through
+ * relative paths, symlinks and hard links. */
 static void check_output_file(const par *p, const char *suffix) {
     size_t size = strlen(p->out) + strlen(suffix) + 1;
     char *output = util_malloc(size);
@@ -159,14 +161,17 @@ static void check_output_file(const par *p, const char *suffix) {
     file_path(output);
     struct stat output_stat;
     bool exists = stat(output, &output_stat) == 0;
-    const char *inputs[] = {p->gt, p->ref, p->map, p->excludesamples, p->excludemarkers, p->ped, p->truth};
+    bool vcf = strcmp(suffix, ".vcf.gz") == 0;
+    const char *inputs[] = {p->ref, p->gt, p->map, p->excludesamples, p->excludemarkers, p->ped, p->truth};
     for (size_t j = 0; j < sizeof inputs / sizeof *inputs; ++j) {
         if (inputs[j] == NULL) continue;
         char *input = file_path(util_strndup(inputs[j], strlen(inputs[j])));
+        bool same_path = strcmp(output, input) == 0;
+        if (vcf && j < 2 && same_path) util_exit("ERROR: VCF output file equals input file: %s", input);
         struct stat input_stat;
-        if (strcmp(output, input) == 0 || (exists && stat(input, &input_stat) == 0
+        if (same_path || (exists && stat(input, &input_stat) == 0
                 && output_stat.st_dev == input_stat.st_dev && output_stat.st_ino == input_stat.st_ino)) {
-            util_exit("ERROR: %soutput file equals input file: %s", strcmp(suffix, ".vcf.gz") == 0 ? "VCF " : "", input);
+            util_exit(PROGRAM ": output file %s equals input file %s", output, input);
         }
         free(input);
     }
