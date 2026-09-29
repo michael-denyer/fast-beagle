@@ -1,7 +1,9 @@
 CC ?= cc
 CFLAGS ?= -O2 -g
+# Package builds set WERROR= so that a newer compiler's warnings cannot stop them.
+WERROR ?= -Werror
 # Part of correctness, not tuning: see the plan's Architecture section.
-override CFLAGS += -std=c11 -Wall -Wextra -Werror -ffp-contract=off -fno-fast-math -fwrapv -Isrc -Ithird_party/libdeflate
+override CFLAGS += -std=c11 -Wall -Wextra $(WERROR) -ffp-contract=off -fno-fast-math -fwrapv -Isrc -Ithird_party/libdeflate
 # fdlibm is kept as upstream wrote it; these warnings flag its style, not bugs.
 FDLIBM_CFLAGS := -Wno-dangling-else -Wno-sign-compare
 # libdeflate 1.25 as plink2 vendors it (bgen=plink2 must compress as plink2 does), built with its own flags.
