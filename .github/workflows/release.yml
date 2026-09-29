@@ -56,28 +56,22 @@ jobs:
           else
             version=$(sed -n 's/^  version: "\(.*\)"$/\1/p' release/conda/recipe.yaml)
           fi
-          echo "version=$version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "version=$version" | tee -a "$GITHUB_OUTPUT"
       # git archive stores the commit time as every file's time, and git's
       # gzip writes no timestamp, so the tarball depends only on the commit.
-      - name: Source tarball
+      - name: Source tarball and recipe
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          mkdir dist
+          mkdir dist recipe
           git archive --format=tar.gz --prefix="fast-beagle-$VERSION/" -o "dist/fast-beagle-$VERSION.tar.gz" HEAD
-          sha256sum "dist/fast-beagle-$VERSION.tar.gz" | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: Recipe with the tarball's version and sha256
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
           sha=$(sha256sum "dist/fast-beagle-$VERSION.tar.gz" | cut -d' ' -f1)
-          mkdir recipe
+          echo "$sha  fast-beagle-$VERSION.tar.gz" | tee -a "$GITHUB_STEP_SUMMARY"
           cp release/conda/build.sh release/conda/small.vcf recipe/
           sed -e "s/^  version: \".*\"$/  version: \"$VERSION\"/" -e "s/^  sha256: .*/  sha256: $sha/" \
             release/conda/recipe.yaml > recipe/recipe.yaml
-          grep -qx "  version: \"$VERSION\"" recipe/recipe.yaml
-          grep -qx "  sha256: $sha" recipe/recipe.yaml
+          grep -x "  version: \"$VERSION\"" recipe/recipe.yaml
+          grep -x "  sha256: $sha" recipe/recipe.yaml
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: release-source
@@ -250,7 +244,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: release-binary-${{ matrix.name }}
-          path: fast-beagle-${{ needs.source.outputs.version }}/dist/${{ env.PACKAGE }}.tar.gz
+          path: fast-beagle-${{ env.VERSION }}/dist/${{ env.PACKAGE }}.tar.gz
           if-no-files-found: error
 
   # Publishes the release from a pushed tag once every build and check passed.

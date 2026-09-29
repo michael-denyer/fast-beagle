@@ -32,7 +32,7 @@ tests:
     script:
       - fast-beagle gt=small.vcf out=small nthreads=2
       - test "$(bgzip -dc small.vcf.gz | grep -vc '^#')" = 40
-      - "! bgzip -dc small.vcf.gz | grep -v '^#' | cut -f10- | grep -q /"
+      - "! bgzip -dc small.vcf.gz | grep -v '^#' | cut -f10- | grep /"
 
 about:
   homepage: https://github.com/michael-denyer/fast-beagle-5.5
