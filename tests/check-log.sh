@@ -3,8 +3,8 @@
 # <out>.log files. Timings, timestamps, out= and the lines that name the program are
 # masked, and build/beagle's added CPU time and max memory lines are dropped;
 # every other line must match. build/beagle's standard output must equal its
-# log, and a run that fails on a malformed reference must end its log with the
-# error message.
+# log, and a run that fails on a malformed reference must print one error
+# message and end its log with it, even when every parse worker fails at once.
 #
 # Usage: tests/check-log.sh    (after make build/beagle)
 # CASES restricts the run to the named cases (default all); NTHREADS sets the
@@ -52,16 +52,22 @@ while read -r name _ _ args; do
   fi
 done < <(cases)
 
-# A run that fails after the log exists ends its log with the error message.
+# A run that fails after the log exists prints one error message, and its log
+# ends with that message. bad-alleles makes every parse worker fail at once.
+check_bad_ref() {  # label ref
+  local label=$1 out="$OUT/$1" rc
+  "$ROOT/build/beagle" gt="$DATA/target.vcf.gz" ref="$2" out="$out" nthreads=18 > /dev/null 2> "$out.err"
+  rc=$?
+  if [ "$rc" -ne 1 ] || [ "$(wc -l < "$out.err")" -ne 1 ] || [ "$(tail -1 "$out.log")" != "$(cat "$out.err")" ]; then
+    echo "FAIL $label: exit=$rc, log ends '$(tail -1 "$out.log")', stderr:"; head -c 600 "$out.err"; echo; fail=1
+  else
+    echo "PASS $label: the log ends with '$(cat "$out.err")'"
+  fi
+}
 if [ -z "${CASES:-}" ]; then
   echo junk | gzip > "$OUT/junk.vcf.gz"
-  "$ROOT/build/beagle" gt="$DATA/target.vcf.gz" ref="$OUT/junk.vcf.gz" out="$OUT/bad" nthreads="$T" \
-    > /dev/null 2> "$OUT/bad.err"
-  rc=$?
-  if [ "$rc" -ne 1 ] || [ "$(tail -1 "$OUT/bad.log")" != "$(cat "$OUT/bad.err")" ]; then
-    echo "FAIL bad-ref: exit=$rc, log ends '$(tail -1 "$OUT/bad.log")', stderr '$(cat "$OUT/bad.err")'"; fail=1
-  else
-    echo "PASS bad-ref: the log ends with '$(cat "$OUT/bad.err")'"
-  fi
+  check_bad_ref bad-ref "$OUT/junk.vcf.gz"
+  gzip -dc "$DATA/ref.vcf.gz" | awk 'BEGIN {OFS = "\t"} /^#/ {print; next} {$NF = "7|7"; print}' | gzip > "$OUT/bad-alleles.ref.vcf.gz"
+  check_bad_ref bad-alleles "$OUT/bad-alleles.ref.vcf.gz"
 fi
 exit $fail
