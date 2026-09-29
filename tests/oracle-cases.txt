@@ -46,3 +46,6 @@ imp-gap   dfe2fbe380f2003c  -           ref=@ref.vcf.gz gt=@target.gap.vcf.gz
 gt-common 157cfa67120dc9f3  -           gt=@test.common.vcf.gz
 gt-common-map c96dc1be7e861a1f  -           gt=@test.common.vcf.gz map=@map.map window=0.6 overlap=0.2
 gt-rare   81f328aed13131ef  -           gt=@test.rare.vcf.gz
+# Imputation with err=0 that leaves every state probability 0, so the imputed
+# marker has AF=NaN, which Beagle writes as NaN.
+imp-nan   1ef6ecf428b6683a  -           ref=@ref.nan.vcf.gz gt=@target.nan.vcf.gz err=0

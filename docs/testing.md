@@ -25,6 +25,7 @@ To check fast-beagle, run `tests/check-oracle.sh build/beagle`.
 - exclusion lists
 - bref3 references, one of them with END= on SNV and indel records
 - a bref3 edge case (IDs with a 4-byte character, an invalid byte and two entries, a marker with no ALT allele, a symbolic allele)
+- a 2-marker target and a 3-marker, 2-sample reference, whose middle marker `err=0` imputes with `AF=NaN`
 - for `tests/check-bgen.sh`, the chrX split moved to chromosome 22 and the reference/target split moved to chromosome 38
 
 ## Oracle hashes
