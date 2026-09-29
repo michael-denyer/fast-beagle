@@ -49,7 +49,7 @@ When an input file has several malformed records, both tools report one of them.
 
 When a command line has more than one unrecognized parameter, both tools list them in one message. Beagle lists them in hash-map order. fast-beagle lists them in the order you gave them.
 
-A few errors exist only in fast-beagle, such as a refused `ped=` or a failure to start a thread. Their messages start with `fast-beagle:`.
+A few errors exist only in fast-beagle, such as a refused `ped=` or a failure to start a thread. Their messages start with `fast-beagle:`. fast-beagle also refuses nonfinite probabilities in phased BGEN output and protects input files from log, VCF, BGEN and tabix output destinations, including symbolic and hard-link aliases. [Failed runs](usage.md#failed-runs) describes these checks.
 
 ## Parameters
 

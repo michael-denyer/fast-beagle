@@ -71,6 +71,7 @@ trace_threads() {
 
 step fixtures tests/fetch-fixtures.sh
 step gate-tier tests/check-gate-tier.sh
+step log-recording python3 tests/check_log_recording.py
 full_step cases python3 tests/check_cases.py
 full_step jcompat make check-jcompat
 step tracker make check-tracker
@@ -85,6 +86,7 @@ full_step oracle-trace oracle_trace
 step c-build make build/beagle
 step oracle-c tests/check-oracle.sh build/beagle
 step failures-c tests/check-failures.sh build/beagle
+step output-failures python3 tests/check_output_failures.py build/beagle
 step log-c tests/check-log.sh build/beagle
 step piece-size make check-piece-size
 step bgen-unit make check-bgen-unit

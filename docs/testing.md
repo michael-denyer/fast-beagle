@@ -50,6 +50,8 @@ Every case table row holds a name, the expected outcome, tags and Beagle's argum
 RECORD=1 tests/check-log.sh java -ea -jar data/beagle.27Feb25.75f.jar
 ```
 
+Every log run must also pass its recorded exit and VCF hash checks. Recording stages the new logs and updates `tests/logs/` only after all checks pass. `tests/check_log_recording.py` verifies that failed runs and wrong VCF hashes preserve the previous recordings.
+
 ## Refused inputs
 
 `tests/check-failures.sh` runs an implementation on arguments and inputs that Beagle refuses. Each run must exit 1 with Java's message. The cases are:
@@ -68,6 +70,8 @@ RECORD=1 tests/check-log.sh java -ea -jar data/beagle.27Feb25.75f.jar
 - a bref3 SNV allele code whose permutation index is negative
 - a bref3 header whose sample count overflows when doubled. This case runs for the C build only, because the jar's result depends on its heap size.
 
+`tests/check_output_failures.py build/beagle` checks that log, VCF, BGEN and tabix destinations refuse collisions with input files before writing. It covers both BGEN modes, the tabix index, relative paths, symbolic links and hard links. It also checks that disabled outputs do not cause refusals, that nonfinite phased BGEN probabilities fail with a message and leave no BGEN files, and that a large `ne=` saturates the reported population size as Java does. The gate runs these checks normally and under the sanitizers, with leak detection off for the expected failures.
+
 ## Compare trace seams
 
 `java/trace.patch` holds trace hooks for the Java source. `make java-trace` applies the patch to a copy in `build/java-trace/`. When that build runs with `-Dbeagle.trace=<dir>`, it writes each trace seam to `<dir>/<seam>.txt`. To change the hooks, edit a patched copy and regenerate the patch with `diff -ruN` against `java/src`.
@@ -83,7 +87,7 @@ The check builds `build/beagle-piece1` with one marker per work item. It runs `b
 
 ## Unit checks
 
-- `make check-jcompat` compares each Java library reproduction in `src/jcompat/` against output printed by real Java (`tests/jcompat/JcompatFixtures.java`).
+- `make check-jcompat` compares each Java library reproduction in `src/jcompat/` against output printed by real Java (`tests/jcompat/JcompatFixtures.java`), including DecimalFormat's NaN and infinity output.
 - `make check-interval` tests `src/vcf/interval_it.c` over an in-memory record source (`tests/vcf/interval_it_test.c`).
 - `make check-records`: `tests/output/record_fixture.c` writes phased, imputed, genotyped, haploid and multiallelic records through the window writer with no BGEN and in both `bgen=` modes. `tests/check_records.py` requires the same VCF from all three runs and the expected VCF fields. It also requires phased BGEN probabilities captured before the VCF rounds them.
 - `make check-tracker` tests the composite haplotype tracker in `src/beagleutil/comp_hap_queue.c` through the interface every caller uses (`tests/beagleutil/tracker_test.c`).
