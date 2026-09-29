@@ -51,6 +51,46 @@ void jnum_format_hash2(char *buf, size_t size, double x) {
     if (end[-1] == '.') end[-1] = '\0';
 }
 
+void jnum_format_sci1(char *buf, size_t size, double x) {
+    char s[JNUM_DOUBLE_STRING_SIZE];
+    jnum_double_to_string(s, x);
+    char *e = strchr(s, 'E');
+    int exp10 = 0;
+    if (e != NULL) {
+        exp10 = atoi(e + 1);
+        *e = '\0';
+    }
+    char dig[JNUM_DOUBLE_STRING_SIZE + 2] = {0};
+    int n_dig = 0, n_seen = 0, point = -1, first = -1;
+    for (const char *c = s; *c != '\0'; ++c) {
+        if (*c == '.') {
+            point = n_seen;
+            continue;
+        }
+        if (first < 0 && *c != '0') first = n_seen;
+        if (first >= 0) dig[n_dig++] = *c;
+        ++n_seen;
+    }
+    if (point < 0) point = n_seen;
+    if (first < 0) {
+        snprintf(buf, size, "%7s", "0.0e+00");
+        return;
+    }
+    exp10 += point - first - 1;
+    int d0 = dig[0] - '0';
+    int d1 = n_dig > 1 ? dig[1] - '0' : 0;
+    if (n_dig > 2 && dig[2] >= '5' && ++d1 == 10) {
+        d1 = 0;
+        if (++d0 == 10) {
+            d0 = 1;
+            ++exp10;
+        }
+    }
+    char t[16];
+    snprintf(t, sizeof t, "%d.%de%c%02d", d0, d1, exp10 < 0 ? '-' : '+', abs(exp10));
+    snprintf(buf, size, "%7s", t);
+}
+
 /* Checks Java's FloatingDecimal grammar and copies the number, without its
  * suffix, into a NUL-terminated buffer for strtod or strtof, which round the
  * same way. Returns 1 for a number, 2 for NaN, 3 for +Infinity, 4 for

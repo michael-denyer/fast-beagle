@@ -123,6 +123,10 @@ void phase_data_update_recomb_intensity(phase_data *pd, float recomb_intensity) 
     pd->p_recomb = p_recomb(&pd->fpd->stage1_map, recomb_intensity);
 }
 
+int64_t phase_data_ne(const phase_data *pd) {
+    return (int64_t)ceil(25 * pd->recomb_intensity * pd->fpd->n_haps);
+}
+
 void phase_data_increment_it(phase_data *pd) {
     ++pd->it;
     pd->lr_threshold = lr_threshold(pd->par, pd->it);
