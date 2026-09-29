@@ -85,7 +85,6 @@ b6de011c5d0c11bd a23fa985fc083b96 389dcb837a7538d3 imp-map plink2
 f01296fd57394344 a23fa985fc083b96 a43103c13f805894 imp-multi phased
 6d40c33166d2a4e9 a23fa985fc083b96 a43103c13f805894 imp-multi phased bgen-bits=1
 cf3545bfb717b875 a23fa985fc083b96 153ace169e14aa43 imp-multi plink2
-ab5debe6f6ba4ac6 cf8e277369afa7b8 4ad0aaab69c05105 imp-nan phased
 80a651524623bc79 cf8e277369afa7b8 4ad0aaab69c05105 imp-nan plink2
 44f3309d29c069a0 a23fa985fc083b96 a345b233f5632f6f imp-states phased
 158cd6a4953b473b a23fa985fc083b96 a345b233f5632f6f imp-states plink2

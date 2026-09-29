@@ -194,6 +194,11 @@ check_run() {  # name mode outcome beagle-args...
   case "$mode $outcome" in
     "plink2 ok" | "phased ok") check_ok "$name bgen=$mode${*:+ $*}" "$out.$mode" "$mode" "$name $mode${*:+ $*}" "$@" ;;
     plink2\ *) check_both_fail "$name${*:+ $*}" "$out" "$outcome" "$@" ;;
+    phased\ *)
+      case_run "$args" "$out.phased" $THREADS "$BEAGLE" bgen=phased "$@"
+      refused "$out.phased.run.log" $? "$outcome" "$out.phased.bgen" "$out.phased.info" "$out.phased.sample" \
+        || { failed "$name bgen=phased $VERDICT"; return; }
+      pass "$name bgen=phased fails: $outcome" ;;
     *) failed "$name${*:+ $*}: no check for mode $mode with outcome $outcome" ;;
   esac
 }
@@ -206,7 +211,11 @@ all_runs() {
     else
       echo "$name plink2 | ok"
     fi
-    echo "$name phased | ok"
+    if has_tag "$tags" nonfinite; then
+      echo "$name phased | cannot encode a non-finite allele probability"
+    else
+      echo "$name phased | ok"
+    fi
   done < <(cases "${TABLES[@]}")
   awk '!/^#/ && NF' <<< "$RUNS"
 }

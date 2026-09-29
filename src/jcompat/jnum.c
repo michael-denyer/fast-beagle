@@ -39,11 +39,15 @@ int64_t jnum_round_d(double x) {
     return jnum_d2l(round_half_up(x));
 }
 
-/* printf rounds the exact binary value, ties to even, as DecimalFormat does. */
+/* DecimalFormat has its own nonfinite strings. For finite values, printf
+ * rounds the exact binary value, ties to even, as DecimalFormat does. */
 void jnum_format_fixed(char *buf, size_t size, double x, int digits) {
-    if (isnan(x)) snprintf(buf, size, "NaN");
-    else if (isinf(x)) snprintf(buf, size, "%s\xe2\x88\x9e", signbit(x) ? "-" : "");
-    else snprintf(buf, size, "%.*f", digits, x);
+    if (!isfinite(x)) {
+        const char *s = isnan(x) ? "NaN" : x < 0 ? "-\xe2\x88\x9e" : "\xe2\x88\x9e";
+        snprintf(buf, size, "%s", s);
+    } else {
+        snprintf(buf, size, "%.*f", digits, x);
+    }
 }
 
 void jnum_format_hash2(char *buf, size_t size, double x) {
