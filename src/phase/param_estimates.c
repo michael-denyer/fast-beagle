@@ -76,7 +76,7 @@ float param_estimates_p_mismatch(param_estimates *pe) {
 }
 
 float param_estimates_recomb_intensity(param_estimates *pe) {
-    qsort(pe->recomb, (size_t)pe->n_recomb, sizeof *pe->recomb, compare_recomb);
+    if (pe->n_recomb > 0) qsort(pe->recomb, (size_t)pe->n_recomb, sizeof *pe->recomb, compare_recomb);
     double sum_switches = 0.0;
     double sum_distances = 0.0;
     for (int j = 0; j < pe->n_recomb; ++j) {
