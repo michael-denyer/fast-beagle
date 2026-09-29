@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Failed oracle runs must not replace the recorded logs, even after a good run."""
+"""Failed oracle runs must not replace the recorded logs, even after a good run.
+
+A successful recording replaces tests/logs/ entirely, dropping removed cases.
+"""
 
 import hashlib
 import os
@@ -42,7 +45,7 @@ class LogRecording(unittest.TestCase):
             (tests / "oracle-cases.txt").write_text(
                 f"first {expected_hash} - ignored=true\nsecond {expected_hash} - ignored=true\n"
             )
-            for name in ("first", "second"):
+            for name in ("first", "second", "removed"):
                 (logs / f"{name}.log").write_text(f"old {name}\n")
             java = root / "java"
             java.write_text(FAKE_JAVA)
@@ -68,6 +71,8 @@ class LogRecording(unittest.TestCase):
             for name in ("first", "second"):
                 want = f"{'old' if failed else 'new'} {name}\n"
                 self.assertEqual((logs / f"{name}.log").read_text(), want)
+            # A case removed from the table loses its log only when recording succeeds.
+            self.assertEqual((logs / "removed.log").exists(), failed)
 
     def test_failed_run_preserves_recordings(self):
         for name in ("first", "second"):

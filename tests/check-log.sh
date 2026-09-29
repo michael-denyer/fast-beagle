@@ -83,6 +83,6 @@ if [ "$1" != java ] && [ -z "${CASES:-}" ]; then
   check_bad_ref bad-alleles "$OUT/bad-alleles.ref.vcf.gz"
 fi
 if [ -n "${RECORD:-}" ] && [ "$fail" -eq 0 ]; then
-  mkdir -p "$LOGS" && cp "$OUT/logs/"*.log "$LOGS/" || fail=1
+  rm -rf "$LOGS" && cp -R "$OUT/logs" "$LOGS" || fail=1
 fi
 exit $fail

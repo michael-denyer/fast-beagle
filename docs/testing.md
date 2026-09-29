@@ -50,7 +50,7 @@ Every case table row holds a name, the expected outcome, tags and Beagle's argum
 RECORD=1 tests/check-log.sh java -ea -jar data/beagle.27Feb25.75f.jar
 ```
 
-Every log run must also pass its recorded exit and VCF hash checks. Recording stages the new logs and updates `tests/logs/` only after all checks pass. `tests/check_log_recording.py` verifies that failed runs and wrong VCF hashes preserve the previous recordings.
+Every log run must also pass its recorded exit and VCF hash checks. Recording stages the new logs and replaces `tests/logs/` only after all checks pass, so logs of removed cases go too. `tests/check_log_recording.py` verifies that failed runs and wrong VCF hashes preserve the previous recordings.
 
 ## Refused inputs
 
