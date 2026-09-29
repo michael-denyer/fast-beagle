@@ -1,7 +1,9 @@
 name: gate
 
 # tests/gate-steps.sh: every check of the pre-merge gate (tests/check-local.sh
-# runs the same list). Lint runs in lint.yml.
+# runs the same list). Lint runs in lint.yml. The gate job is the single
+# required check: it passes only when every check job passed, or when the plan
+# ran no checks.
 
 on:
   push:
@@ -21,7 +23,8 @@ concurrency:
 jobs:
   # Picks the tier. Pushes to main run the C tier, which compares the C binary
   # against recorded results. A pull request runs the tier tests/gate-tier.sh
-  # picks from its changed files. The nightly run uses the full tier with random
+  # picks from its changed files, and no checks when that tier is none (every
+  # changed file is documentation). The nightly run uses the full tier with random
   # fuzz examples, and is skipped when main has not moved since its last
   # success. Manual runs use the full tier.
   plan:
@@ -34,6 +37,7 @@ jobs:
       run: ${{ steps.plan.outputs.run }}
       tier: ${{ steps.plan.outputs.tier }}
       fuzz: ${{ steps.plan.outputs.fuzz }}
+      groups: ${{ steps.plan.outputs.groups }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -50,7 +54,8 @@ jobs:
           run=true tier=c fuzz=fixed
           case $EVENT in
             pull_request)
-              tier=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename' | tests/gate-tier.sh) ;;
+              tier=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename' | tests/gate-tier.sh)
+              if [ "$tier" = none ]; then run=false; fi ;;
             workflow_dispatch) tier=full fuzz=random ;;
             schedule)
               tier=full fuzz=random
@@ -58,10 +63,16 @@ jobs:
                 --jq '.workflow_runs[0].head_sha // ""')
               if [ "$last" = "$SHA" ]; then run=false; fi ;;
           esac
-          echo "run=$run tier=$tier fuzz=$fuzz"
-          { echo "run=$run"; echo "tier=$tier"; echo "fuzz=$fuzz"; } >> "$GITHUB_OUTPUT"
+          # Every check in the java group is full-tier only.
+          groups='["core","bgen","java","sanitizers"]'
+          if [ "$tier" = c ]; then groups='["core","bgen","sanitizers"]'; fi
+          echo "run=$run tier=$tier fuzz=$fuzz groups=$groups"
+          { echo "run=$run"; echo "tier=$tier"; echo "fuzz=$fuzz"; echo "groups=$groups"; } >> "$GITHUB_OUTPUT"
 
-  gate:
+  # One job per runner and check group of tests/gate-steps.sh; the setup
+  # checks (the fixtures and the C build) run in every job.
+  check:
+    name: check (${{ matrix.runner }}, ${{ matrix.group }})
     needs: plan
     if: needs.plan.outputs.run == 'true'
     timeout-minutes: 150
@@ -69,6 +80,7 @@ jobs:
       fail-fast: false
       matrix:
         runner: [macos-latest, ubuntu-latest]
+        group: ${{ fromJSON(needs.plan.outputs.groups) }}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -110,15 +122,38 @@ jobs:
       - name: Gate
         env:
           GATE_TIER: ${{ needs.plan.outputs.tier }}
+          GATE_GROUP: ${{ matrix.group }}
           GATE_FUZZ: ${{ needs.plan.outputs.fuzz }}
         run: PLINK2="$RUNNER_TEMP/plink2/plink2" tests/gate-steps.sh .
       - name: Tail of every check log
         if: failure()
         run: tail -n 40 build/check-*.log
+      # The tail alone can hide a report printed well before the log ends.
+      - name: Context before every FAIL line
+        if: failure()
+        run: grep -B 40 -A 5 '^FAIL' build/check-*.log | head -n 2000 || true
       - name: Keep the shrunk fuzz failure
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: fuzz-fail-${{ matrix.runner }}
+          name: fuzz-fail-${{ matrix.runner }}-${{ matrix.group }}
           path: build/fuzz-fail
           if-no-files-found: ignore
+
+  gate:
+    needs: [plan, check]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          PLAN: ${{ needs.plan.result }}
+          RUN: ${{ needs.plan.outputs.run }}
+          CHECK: ${{ needs.check.result }}
+        run: |
+          echo "plan=$PLAN run=$RUN check=$CHECK"
+          if [ "$PLAN" = success ] && { [ "$CHECK" = success ] || { [ "$CHECK" = skipped ] && [ "$RUN" = false ]; }; }; then
+            exit 0
+          fi
+          echo "::error::gate failed: plan $PLAN, run $RUN, check $CHECK"
+          exit 1

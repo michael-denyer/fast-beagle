@@ -1,18 +1,20 @@
 #!/bin/bash
 # Prints the gate tier a change needs, given its changed paths one per line on
-# standard input: c when the C tier checks every path, full otherwise. Only
-# files under src/ (except src/jcompat/), third_party/ and docs/, and Markdown
-# files, qualify. Every other path, including every test script and table, runs
-# the full tier, so a new full-tier check needs no entry here.
+# standard input. none: every path is documentation only (docs/, Markdown,
+# images and LICENSE), which no check reads. c: every other path is under src/
+# (except src/jcompat/) or third_party/, which the C tier checks. full: any
+# other path, including every test script and table, so a new full-tier check
+# needs no entry here.
 #
 # Usage: git diff --name-only origin/main | tests/gate-tier.sh
 set -uo pipefail
-tier=c n=0
+tier=none n=0
 while IFS= read -r path; do
   n=$((n + 1))
   case $path in
+    docs/* | *.md | *.png | *.svg | *.jpg | *.jpeg | *.gif | *.webp | LICENSE) ;;
     src/jcompat/*) tier=full ;;
-    src/* | third_party/* | docs/* | *.md) ;;
+    src/* | third_party/*) [ "$tier" = none ] && tier=c ;;
     *) tier=full ;;
   esac
 done
