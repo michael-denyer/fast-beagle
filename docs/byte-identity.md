@@ -19,7 +19,7 @@ Each check below runs in the pre-merge gate, `tests/gate-steps.sh`, except the c
 | [Oracle hashes](#oracle-hashes) | The VCF hash of each case against the hash that the jar writes | 34 cases, each at 1, 2 and 18 threads, for the jar, a build of the Java source, the Java trace build and fast-beagle | `tests/check-oracle.sh build/beagle` |
 | [Trace seams](#trace-seams) | Intermediate values at 20 points in the pipeline, against an instrumented Java build | 41 cases at 2 threads, and 9 seams again at 1 and 18 threads on the 2 thread-dependent cases | `tests/check-trace.sh T1a T1b ... T5d` |
 | [Differential fuzzing](#differential-fuzzing) | Generated inputs and options run through the jar and fast-beagle | 200 examples at 1, 2, 3 or 5 threads, plus 2 examples for each of 42 invalid-parameter changes, plus 1 saved regression | `uv run --python 3.12 --script tests/check_fuzz.py --examples 200` |
-| [Refused inputs](#refused-inputs) | Inputs that Beagle rejects, with the exit code and Java's message | 17 cases for fast-beagle, 16 of them also on the jar | `tests/check-failures.sh build/beagle` |
+| [Refused inputs](#refused-inputs) | Inputs that Beagle rejects, with the exit code and Java's message | 18 cases for fast-beagle, 17 of them also on the jar | `tests/check-failures.sh build/beagle` |
 | [Java library fixtures](#java-library-fixtures) | C reproductions of the Java library behaviour that Beagle depends on, against a real JVM | 8 fixture sets | `make check-jcompat` |
 | [Thread safety and ordering](#thread-safety-and-ordering) | Memory errors, undefined behaviour and data races on the oracle cases, the ordered writer protocol, and the imputation work-item size | Sanitizers on 34 cases, TLC on 8 model sizes, piece size on 19 cases at 2 and 18 threads | `tests/check-sanitizers.sh`, `tests/check-tla.sh`, `make check-piece-size` |
 | [Platforms](#platforms) | The whole gate on two operating systems and two CPU architectures | macOS arm64 and Linux x86_64 | `tests/check-local.sh` |
@@ -60,9 +60,10 @@ The full gate runs a fixed set of 200 examples and 2 examples per invalid-parame
 
 ### Refused inputs
 
-`tests/check-failures.sh` runs inputs that Beagle rejects at 2 threads. Each run must exit 1 and print the same message that the jar prints, and must write no output. The 17 cases are:
+`tests/check-failures.sh` runs inputs that Beagle rejects at 2 threads. Each run must exit 1 and print the same message that the jar prints, and must write no output. The 18 cases are:
 
 - 5 parameter errors: `out=` equal to the `gt=` file (twice, once with a doubled slash), `out=` equal to the `ref=` file, `out=` naming a directory, and `window` less than 1.1 times `overlap`
+- a `window` shorter than the marker spacing, which leaves a window with no marker
 - 8 genetic map errors
 - a one-character non-ASCII GT allele
 - a bref3 SNV allele code with a negative permutation index

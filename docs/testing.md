@@ -56,6 +56,7 @@ RECORD=1 tests/check-log.sh java -ea -jar data/beagle.27Feb25.75f.jar
 
 - an `out=` that names the `gt=` or `ref=` file or a directory. A refused `out=` must leave the input unchanged and write no VCF.
 - `window` less than 1.1 times `overlap`
+- a `window` shorter than the marker spacing, which leaves a window with no marker
 - `imp-segment` below half of `imp-step`
 - genetic map files that Beagle rejects:
   - genetic positions that are all equal

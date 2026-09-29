@@ -48,6 +48,10 @@ ABSENT="$OUT/dir.vcf.gz" check out-directory "ERROR: \"out\" parameter cannot be
 ABSENT="$OUT/window.vcf.gz" check window-overlap \
   "ERROR: The \"window\" parameter must be at least 1.1 times the \"overlap\" parameter" \
   gt="$DATA/target.vcf.gz" out="$OUT/window" window=1 overlap=1
+# A window shorter than the marker spacing holds no marker, and BasicGT
+# indexes the empty marker array.
+check empty-window "java.lang.ArrayIndexOutOfBoundsException: Index 0 out of bounds for length 0" \
+  gt="$DATA/target.thin.vcf.gz" window=0.0000001 overlap=0.00000001 out="$OUT/empty-window"
 
 # VcfRecGTParser reads a one-character allele as c - '0' and longer ones with
 # Integer.parseInt, so a lone Arabic-Indic one (U+0661) is allele 1585.
