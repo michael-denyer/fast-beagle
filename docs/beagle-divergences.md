@@ -8,7 +8,9 @@ fast-beagle is a C port of Java Beagle 5.5 (`beagle.27Feb25.75f.jar`). Run with 
 |---|---|---|
 | VCF text | The reference output | Byte-identical at the same `nthreads=` |
 | `.vcf.gz` file bytes | BGZF from Beagle's own writer | BGZF from htslib, so the compressed bytes differ |
+| `<out>.log` and standard output | Beagle's progress report | The same report, naming fast-beagle, with `CPU time:` and `Max memory:` added and a failed run's error at the end of the log. See [Log file and console output](usage.md#log-file-and-console-output). |
 | No arguments | Prints the usage text and exits 0 | Prints `missing gt argument` and exits 1 |
+| Error output | The message, often with the exception class, a stack trace, the usage text or the banner | The message only |
 | Exit status on error | 1 | 1 |
 | `ped=` | Accepted and ignored | Refused |
 | Added parameters | None | `bgen=`, `bgen-bits=`, `bgen-min-dr2=`, `bgen-min-maf=`, `bgen-chr-set=`, `tbi=`, `trace=` |
@@ -35,7 +37,15 @@ With no arguments, Beagle prints its usage text and exits with status 0. fast-be
 
 ## Errors and exit status
 
-Both tools exit with status 1 when they refuse a run.
+Both tools exit with status 1 when they refuse a run. fast-beagle prints the same message text as Beagle, on standard error. It leaves out the lines Beagle adds around that message:
+
+- For a parameter error, Beagle prints the message after `Exception in thread "main" java.lang.IllegalArgumentException:` and follows it with a stack trace.
+- For an input file that does not exist, Beagle adds `java.lang.Throwable: File does not exist` and a stack trace.
+- For an unrecognized parameter, a missing input file and several input errors, Beagle ends with a blank line and `Terminating program.`
+- For an `out=` that is a directory or names an input file, Beagle prints the full usage text before the message.
+- For a `window=` less than 1.1 times `overlap=`, Beagle prints its banner before the message and `Exiting program.` after it.
+
+When an input file has several malformed records, both tools report one of them. At `nthreads=` above 1, the parse threads race, so the record named can change from run to run and can differ between the tools.
 
 When a command line has more than one unrecognized parameter, both tools list them in one message. Beagle lists them in hash-map order. fast-beagle lists them in the order you gave them.
 
