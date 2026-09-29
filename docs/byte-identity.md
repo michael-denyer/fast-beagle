@@ -19,7 +19,7 @@ Each check below runs in the pre-merge gate, `tests/gate-steps.sh`, except the c
 | [Oracle hashes](#oracle-hashes) | The VCF hash of each case against the hash that the jar writes | 35 cases, each at 1, 2 and 18 threads, for the jar, a build of the Java source, the Java trace build and fast-beagle | `tests/check-oracle.sh build/beagle` |
 | [Trace seams](#trace-seams) | Intermediate values at 20 points in the pipeline, against an instrumented Java build | 42 cases at 2 threads, and 9 seams again at 1 and 18 threads on the 2 thread-dependent cases | `tests/check-trace.sh T1a T1b ... T5d` |
 | [Differential fuzzing](#differential-fuzzing) | Generated inputs and options run through the jar and fast-beagle | 200 examples at 1, 2, 3 or 5 threads, plus 2 examples for each of 42 invalid-parameter changes, plus 1 saved regression | `uv run --python 3.12 --script tests/check_fuzz.py --examples 200` |
-| [Refused inputs](#refused-inputs) | Inputs that Beagle rejects, with the exit code and Java's message | 18 cases for fast-beagle, 17 of them also on the jar | `tests/check-failures.sh build/beagle` |
+| [Refused inputs](#refused-inputs) | Inputs that Beagle rejects, with the exit code and Java's message | 19 cases for fast-beagle, 18 of them also on the jar, and 49 fast-beagle-only output collision checks | `tests/check-failures.sh build/beagle` |
 | [Java library fixtures](#java-library-fixtures) | C reproductions of the Java library behaviour that Beagle depends on, against a real JVM | 8 fixture sets | `make check-jcompat` |
 | [Thread safety and ordering](#thread-safety-and-ordering) | Memory errors, undefined behaviour and data races on the oracle cases, the ordered writer protocol, and the imputation work-item size | Sanitizers on 35 cases, TLC on 8 model sizes, piece size on 20 cases at 2 and 18 threads | `tests/check-sanitizers.sh`, `tests/check-tla.sh`, `make check-piece-size` |
 | [Platforms](#platforms) | The whole gate on two operating systems and two CPU architectures | macOS arm64 and Linux x86_64 | `tests/check-local.sh` |
@@ -60,9 +60,9 @@ The full gate runs a fixed set of 200 examples and 2 examples per invalid-parame
 
 ### Refused inputs
 
-`tests/check-failures.sh` runs inputs that Beagle rejects at 2 threads. Each run must exit 1 and print the same message that the jar prints, and must write no output. The 18 cases are:
+`tests/check-failures.sh` runs inputs that Beagle rejects at 2 threads. Each run must exit 1 and print the same message that the jar prints, and must write no output. The 19 cases are:
 
-- 5 parameter errors: `out=` equal to the `gt=` file (twice, once with a doubled slash), `out=` equal to the `ref=` file, `out=` naming a directory, and `window` less than 1.1 times `overlap`
+- 6 parameter errors: `out=` equal to the `gt=` file (three times: as given, with a doubled slash in `out=`, and with a doubled slash in `gt=`), `out=` equal to the `ref=` file, `out=` naming a directory, and `window` less than 1.1 times `overlap`. The `out=` messages must name the input by its normalized path, as `java.io.File` prints it.
 - a `window` shorter than the marker spacing, which leaves a window with no marker
 - 8 genetic map errors
 - a one-character non-ASCII GT allele
@@ -71,6 +71,8 @@ The full gate runs a fixed set of 200 examples and 2 examples per invalid-parame
 - a bref3 header whose sample count overflows when doubled
 
 The gate runs the script on the jar and on fast-beagle. The bref3 sample-count case runs for fast-beagle only, because the jar's result depends on its heap size.
+
+On fast-beagle only, the script also runs 49 checks of the [output collision refusal](beagle-divergences.md#errors-and-exit-status), which Beagle does not have. In 48 runs an output is an existing input file: through `./`, `..`, a relative path, a symlink, a hard link and a directory symlink, and each output file against each input file parameter. Each run must print the `fast-beagle:` message, leave the input unchanged and write no file. The 49th run names an input like an output that is not enabled, and must succeed.
 
 ### Java library fixtures
 

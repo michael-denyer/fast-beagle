@@ -55,7 +55,7 @@ RECORD=1 tests/check-log.sh java -ea -jar data/beagle.27Feb25.75f.jar
 
 `tests/check-failures.sh` runs an implementation on arguments and inputs that Beagle refuses. Each run must exit 1 with Java's message. The cases are:
 
-- an `out=` that names the `gt=` or `ref=` file or a directory. A refused `out=` must leave the input unchanged and write no VCF.
+- an `out=` that names the `gt=` or `ref=` file or a directory. A refused `out=` must leave the input unchanged and write no VCF. The message must name the input by its normalized path, also when `gt=` has a doubled slash.
 - `window` less than 1.1 times `overlap`
 - a `window` shorter than the marker spacing, which leaves a window with no marker
 - `imp-segment` below half of `imp-step`
@@ -69,6 +69,8 @@ RECORD=1 tests/check-log.sh java -ea -jar data/beagle.27Feb25.75f.jar
 - a one-character non-ASCII GT allele
 - a bref3 SNV allele code whose permutation index is negative
 - a bref3 header whose sample count overflows when doubled. This case runs for the C build only, because the jar's result depends on its heap size.
+
+For the C build only, the script also checks fast-beagle's output collision refusal, which Beagle does not have. Each run names an existing input file as an output: through `./`, `..`, a relative `out=`, a symlink, a hard link and a directory symlink, and each output file (`.vcf.gz`, `.log`, `.vcf.gz.tbi`, `.bgen`, `.sample`, `.info`) against each input file parameter (`gt=`, `ref=`, `map=`, `excludesamples=`, `excludemarkers=`, `ped=`, `truth=`). Each run must print the `fast-beagle:` message, leave the input unchanged and write no file. One more run names an input like a BGEN output without `bgen=`, and must succeed.
 
 ## Compare trace seams
 
