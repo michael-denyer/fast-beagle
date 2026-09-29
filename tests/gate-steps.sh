@@ -86,7 +86,7 @@ trace_threads() {
   done
 }
 
-step setup fixtures tests/fetch-fixtures.sh
+step setup fixtures tests/fetch-fixtures.sh --ensure
 step core gate-tier tests/check-gate-tier.sh
 step core log-recording python3 tests/check_log_recording.py
 full_step core cases python3 tests/check_cases.py
