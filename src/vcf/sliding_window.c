@@ -117,7 +117,7 @@ static bool ref_has_next(sliding_window *sw) {
 }
 
 sliding_window *sliding_window_open(const par *p) {
-    if (p->ped != NULL) util_exit("fast-beagle: the ped= parameter is not supported");
+    if (p->ped != NULL) util_exit(PROGRAM ": the ped= parameter is not supported");
     sliding_window *sw = util_malloc(sizeof *sw);
     *sw = (sliding_window){0};
     const chrom_interval *interval = p->has_chrom_int ? &p->chrom_int : NULL;
