@@ -13,8 +13,8 @@
 # fixture-cache check and the TLA+ model. It checks the
 # BGEN output against the hashes in tests/bgen-hashes.txt instead of
 # plink2, and runs the saved fuzz regressions but no new fuzz
-# examples. The default is the full gate. GATE_FUZZ=random fuzzes new examples
-# instead of the fixed 200.
+# examples. The default is the full gate. GATE_FUZZ=random fuzzes 1000 new
+# examples instead of the fixed 200.
 #
 # Each check names its group, after an optional tier (full or c) and an
 # optional macos, which limits it to macOS and prints a skip line elsewhere.
@@ -41,7 +41,7 @@ bgen_oracle=live logs=build/check-
 fuzz_args=(--examples 200)
 case ${GATE_FUZZ:-fixed} in
   fixed) ;;
-  random) fuzz_args+=(--random) ;;
+  random) fuzz_args=(--examples 1000 --random) ;;
   *) echo "GATE_FUZZ must be fixed or random, not $GATE_FUZZ"; exit 2 ;;
 esac
 in_group() { [ "$group" = all ] || [ "$1" = setup ] || [ "$1" = "$group" ]; }
