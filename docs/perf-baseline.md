@@ -22,7 +22,7 @@ This run imputed one chromosome for about 100,000 target samples and wrote about
 | CPU time | 30,420 s | 13,499 s | 2.3× less |
 | Max memory | 296.4 GB | 84.3 GB | 3.5× less |
 
-The C binary was built with GCC 13.3 and linked against Ubuntu 24.04's shared htslib. On 2026-09-30, commit `9e4be51` built the same way took 291 s. The static build from `release/build-static.sh` (GCC 14.2.1, htslib without libdeflate) took 338 s and 16,685 s of CPU time, so at this scale the release tarball is about 2.6× faster than Java rather than 3.1×.
+The C binary was built with GCC 13.3 and linked against Ubuntu 24.04's shared htslib, which uses libdeflate. On 2026-09-30, commit `9e4be51` built the same way took 291 s. A static build of that commit with htslib linked against zlib alone took 338 s and 16,685 s of CPU time. `release/build-static.sh` links libdeflate for this reason.
 
 The C run did not write a tabix index. With `tbi=true`, the same step took 346 s and 16,194 s of CPU time at the same max memory, and it replaced a separate `tabix -p vcf` pass.
 
