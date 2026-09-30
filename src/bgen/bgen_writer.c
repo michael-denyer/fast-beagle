@@ -42,7 +42,8 @@ typedef struct {
 struct bgen_writer {
     bgen_mode mode;
     FILE *bgen, *info_file, *sample_file;  /* non-NULL once this run has created the file */
-    char *bgen_path, *sample_path, *info_path;
+    const char *bgen_path, *sample_path, *info_path;
+    run_outputs *outputs;
     const samples *samples;
     bool has_min_dr2;
     double min_dr2, min_maf;
@@ -146,19 +147,14 @@ void bgen_writer_check_chrom(bgen_writer *bw, const char *chrom) {
     }
 }
 
-bgen_writer *bgen_writer_open(const par *p, const samples *s) {
+bgen_writer *bgen_writer_open(const par *p, run_outputs *out, const samples *s) {
     bgen_writer *bw = util_malloc(sizeof *bw);
     *bw = (bgen_writer){0};
     bw->mode = p->bgen;
-    kstring_t path = {0, 0, NULL};
-    ksprintf(&path, "%s.bgen", p->out);
-    bw->bgen_path = path.s;
-    path = (kstring_t){0, 0, NULL};
-    ksprintf(&path, "%s.sample", p->out);
-    bw->sample_path = path.s;
-    path = (kstring_t){0, 0, NULL};
-    ksprintf(&path, "%s.info", p->out);
-    bw->info_path = path.s;
+    bw->outputs = out;
+    bw->bgen_path = run_outputs_path(out, RUN_OUTPUT_BGEN);
+    bw->sample_path = run_outputs_path(out, RUN_OUTPUT_SAMPLE);
+    bw->info_path = run_outputs_path(out, RUN_OUTPUT_INFO);
     bw->samples = s;
     bw->has_min_dr2 = p->has_bgen_min_dr2;
     bw->min_dr2 = p->bgen_min_dr2;
@@ -701,8 +697,5 @@ void bgen_writer_close(bgen_writer *bw) {
     open_writer = NULL;
     free(bw->rec.s);
     free(bw->n_missing);
-    free(bw->sample_path);
-    free(bw->info_path);
-    free(bw->bgen_path);
     free(bw);
 }
