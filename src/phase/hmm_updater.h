@@ -18,9 +18,8 @@
 float hmm_fwd_update(const float *prev, float *fwd, float fwd_sum, float p_switch, const float p_mismatch[2], const uint8_t *mismatch, int n_states);
 void hmm_bwd_update(float *bwd, float p_switch, const float p_mismatch[2], const uint8_t *mismatch, int n_states);
 
-/* The same steps for three HMMs sharing p_switch and n_states, in one pass
- * over the states. Each HMM's sum accumulates in state order, so results
- * equal three separate calls. */
+/* The same steps for three HMMs sharing p_switch and n_states. Each HMM's
+ * sum accumulates in state order, so results equal three separate calls. */
 void hmm_fwd_update3(float *fwd[3], float fwd_sums[3], float p_switch, const float p_mismatch[2], const uint8_t *m0, const uint8_t *m1, const uint8_t *m2, int n_states);
 void hmm_bwd_update3(float *bwd[3], float p_switch, const float p_mismatch[2], const uint8_t *m0, const uint8_t *m1, const uint8_t *m2, int n_states);
 
