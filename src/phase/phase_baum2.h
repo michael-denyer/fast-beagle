@@ -58,9 +58,10 @@ typedef struct {
 
 /* new PhaseBaum2(phaseIbs) */
 void phase_baum2_init(phase_baum2 *pb, const pbwt_phase_ibs *ibs);
-/* PhaseBaum2.phase(sample): updates the sample's SamplePhase and adds its
- * swaps to rate. */
-void phase_baum2_phase(phase_baum2 *pb, int sample, swap_rate *rate);
+/* PhaseBaum2.phase(sample) for sample0 with pb0 and, unless sample1 is -1,
+ * for sample1 with pb1: updates each sample's SamplePhase and adds its swaps
+ * to rate. pb0 and pb1 must be different objects. */
+void phase_baum2_phase_pair(phase_baum2 *pb0, int sample0, phase_baum2 *pb1, int sample1, swap_rate *rate);
 void phase_baum2_free(phase_baum2 *pb);
 
 #endif
