@@ -24,7 +24,7 @@ JCOMPAT_FIXTURES := random math numbers utf8 parse parseint pqueue search
 LIBDEFLATE_OBJ := $(patsubst %.c,build/obj/%.o,$(wildcard third_party/libdeflate/lib/*.c third_party/libdeflate/lib/*/*.c))
 BEAGLE_OBJ := $(sort $(patsubst src/%.c,build/obj/%.o,$(wildcard src/*/*.c)) $(JCOMPAT_OBJ) $(LIBDEFLATE_OBJ))
 
-.PHONY: all install check-jcompat check-bgen-unit check-records check-vcf-index check-tbi check-tracker check-interval check-block-reader check-snv-perms check-piece-size java-trace clean
+.PHONY: all install check-jcompat check-bgen-unit check-records check-bgen-files check-vcf-index check-tbi check-tracker check-interval check-block-reader check-snv-perms check-piece-size java-trace clean
 .SECONDARY:
 .DELETE_ON_ERROR:
 all: build/beagle
@@ -84,6 +84,13 @@ check-records: build/output/record_fixture
 	python3 -B tests/check_records.py
 
 build/output/record_fixture: tests/output/record_fixture.c $(filter-out build/obj/main/main.o,$(BEAGLE_OBJ))
+	@mkdir -p $(@D)
+	$(LINK)
+
+check-bgen-files: build/output/bgen_files_fixture
+	python3 -B tests/check_bgen_files.py
+
+build/output/bgen_files_fixture: tests/output/bgen_files_fixture.c build/obj/bgen/bgen_files.o build/obj/main/run_outputs.o build/obj/blbutil/utilities.o $(JCOMPAT_OBJ)
 	@mkdir -p $(@D)
 	$(LINK)
 

@@ -249,7 +249,7 @@ static void write_line(window_writer *ww) {
     ww->line.l = 0;
 }
 
-void window_writer_open(window_writer *ww, const par *p, const samples *s) {
+void window_writer_open(window_writer *ww, const par *p, const run_outputs *out, const samples *s) {
     static pthread_once_t tables_once = PTHREAD_ONCE_INIT;
     pthread_once(&tables_once, init_tables);
     ww->samples = s;
@@ -261,10 +261,8 @@ void window_writer_open(window_writer *ww, const par *p, const samples *s) {
     for (int j = 0; j < 5; ++j) ww->hom_ref[j] = (kstring_t){0};
     hom_ref_fields(ww->hom_ref, p->ap, p->gp);
     ww->line = (kstring_t){0, 0, NULL};
-    ww->bgen = p->bgen != BGEN_NONE ? bgen_writer_open(p, s) : NULL;
-    kstring_t path = {0, 0, NULL};
-    ksprintf(&path, "%s.vcf.gz", p->out);
-    ww->path = path.s;
+    ww->bgen = p->bgen != BGEN_NONE ? bgen_writer_open(p, out, s) : NULL;
+    ww->path = run_outputs_path(out, RUN_OUTPUT_VCF);
     ww->n_written = 0;
     ww->out = bgzf_open(ww->path, "w");
     if (ww->out == NULL) util_exit("Error opening %s", ww->path);
@@ -307,7 +305,7 @@ void window_writer_open(window_writer *ww, const par *p, const samples *s) {
         kputs(s->ids[j], l);
     }
     write_line(ww);
-    ww->index = p->tbi ? vcf_index_new(ww->path, ww->n_written) : NULL;
+    ww->index = p->tbi ? vcf_index_new(ww->path, run_outputs_path(out, RUN_OUTPUT_TBI), ww->n_written) : NULL;
 }
 
 void window_writer_begin_window(window_writer *ww, const window *w) {
@@ -496,6 +494,5 @@ void window_writer_close(window_writer *ww) {
     if (ww->index != NULL) vcf_index_write(ww->index, ww->n_written);
     if (ww->bgen != NULL) bgen_writer_close(ww->bgen);
     for (int j = 0; j < 5; ++j) free(ww->hom_ref[j].s);
-    free(ww->path);
     free(ww->line.s);
 }

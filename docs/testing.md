@@ -157,7 +157,9 @@ The live checks need `PLINK2` naming the pinned plink2 binary, and fail without 
 
 - On Linux, LeakSanitizer also runs, so any memory still allocated at a normal exit fails the check. LeakSanitizer does not support macOS arm64.
 
-`tests/check-tsan.sh` builds `build/beagle` with ThreadSanitizer in `build/tsan`. It runs every oracle case at 18 threads, and runs the cases with per-thread hashes again with `trace=`. Every run must pass the oracle verdict with no ThreadSanitizer report. The script runs on macOS only, because ThreadSanitizer cannot start under the x86_64 emulation of the gate's docker leg. On other systems it refuses to run, and `tests/gate-steps.sh` prints a `skip` line for it.
+`make check-bgen-files` checks BGEN partial-file cleanup through subprocess exits and real files. It covers closed partial members, completed members surviving a later failure, captured reader errors, a normal exit, and a concurrent sample open after terminal cleanup. ASan/UBSan and ThreadSanitizer run these checks too. The output refusal checks cover both BGEN modes with read-ahead errors and a pre-existing sample file. On Linux they also verify that completed BGEN files survive a log close failure using `/dev/full`.
+
+`tests/check-tsan.sh` builds `build/beagle` with ThreadSanitizer in `build/tsan`. It runs the BGEN cleanup and output refusal checks, then every oracle case at 18 threads, and runs the cases with per-thread hashes again with `trace=`. Every run must pass the oracle verdict with no ThreadSanitizer report. Only the expected fatal output refusals disable thread-leak reports, since `util_exit` deliberately exits without joining readers. Race detection remains enabled for them. The script runs on macOS only, because ThreadSanitizer cannot start under the x86_64 emulation of the gate's docker leg. On other systems it refuses to run, and `tests/gate-steps.sh` prints a `skip` line for it.
 
 ## Differential fuzzing
 
