@@ -19,6 +19,10 @@ SAN="$ROOT/build/san"
 mkdir -p "$SAN"
 rsync -a --delete --exclude build "$ROOT/Makefile" "$ROOT/java" "$ROOT/src" "$ROOT/third_party" "$ROOT/tests" "$SAN/"
 SAN_CFLAGS=${SAN_CFLAGS:-"-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined,float-cast-overflow -fno-sanitize-recover=all"}
+# clang cannot vectorise a `#pragma omp simd` loop that holds
+# UndefinedBehaviorSanitizer checks, and reports that as -Wpass-failed, which
+# -Werror turns into an error. The normal build keeps that error.
+SAN_CFLAGS="$SAN_CFLAGS -Wno-pass-failed"
 # make does not rebuild objects when only CFLAGS change.
 make -C "$SAN" clean > /dev/null
 make -C "$SAN" CFLAGS="$SAN_CFLAGS" build/beagle check-bgen-unit check-records check-tracker check-markers check-block-reader build/output/bgen_files_fixture \

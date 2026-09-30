@@ -31,17 +31,27 @@ void hmm_bwd_update(float *bwd, float p_switch, const float p_mismatch[2], const
     for (int k = 0; k < n_states; ++k) bwd[k] = scale * bwd[k] + shift;
 }
 
+/* The three-HMM steps compute each state's value in loops with no sum, which
+ * the compiler can vectorise, and then add the values in state order. `omp
+ * simd` states that a value loop's iterations are independent, so GCC at -O2
+ * vectorises it without a runtime alias check. A mismatch byte is 0 or 1, so
+ * the select equals p_mismatch[mismatch[k]]. */
 void hmm_fwd_update3(float *fwd[3], float fwd_sums[3], float p_switch, const float p_mismatch[2], const uint8_t *m0, const uint8_t *m1, const uint8_t *m2, int n_states) {
     float *restrict f0 = fwd[0], *restrict f1 = fwd[1], *restrict f2 = fwd[2];
+    const uint8_t *restrict d0 = m0, *restrict d1 = m1, *restrict d2 = m2;
+    float match = p_mismatch[0], differ = p_mismatch[1];
     float shift = p_switch / n_states;
     float scale0 = (1.0f - p_switch) / fwd_sums[0];
     float scale1 = (1.0f - p_switch) / fwd_sums[1];
     float scale2 = (1.0f - p_switch) / fwd_sums[2];
+    #pragma omp simd
+    for (int k = 0; k < n_states; ++k) f0[k] = (d0[k] ? differ : match) * (scale0 * f0[k] + shift);
+    #pragma omp simd
+    for (int k = 0; k < n_states; ++k) f1[k] = (d1[k] ? differ : match) * (scale1 * f1[k] + shift);
+    #pragma omp simd
+    for (int k = 0; k < n_states; ++k) f2[k] = (d2[k] ? differ : match) * (scale2 * f2[k] + shift);
     float s0 = 0.0f, s1 = 0.0f, s2 = 0.0f;
     for (int k = 0; k < n_states; ++k) {
-        f0[k] = p_mismatch[m0[k]] * (scale0 * f0[k] + shift);
-        f1[k] = p_mismatch[m1[k]] * (scale1 * f1[k] + shift);
-        f2[k] = p_mismatch[m2[k]] * (scale2 * f2[k] + shift);
         s0 += f0[k];
         s1 += f1[k];
         s2 += f2[k];
@@ -53,11 +63,16 @@ void hmm_fwd_update3(float *fwd[3], float fwd_sums[3], float p_switch, const flo
 
 void hmm_bwd_update3(float *bwd[3], float p_switch, const float p_mismatch[2], const uint8_t *m0, const uint8_t *m1, const uint8_t *m2, int n_states) {
     float *restrict b0 = bwd[0], *restrict b1 = bwd[1], *restrict b2 = bwd[2];
+    const uint8_t *restrict d0 = m0, *restrict d1 = m1, *restrict d2 = m2;
+    float match = p_mismatch[0], differ = p_mismatch[1];
+    #pragma omp simd
+    for (int k = 0; k < n_states; ++k) b0[k] *= d0[k] ? differ : match;
+    #pragma omp simd
+    for (int k = 0; k < n_states; ++k) b1[k] *= d1[k] ? differ : match;
+    #pragma omp simd
+    for (int k = 0; k < n_states; ++k) b2[k] *= d2[k] ? differ : match;
     float s0 = 0.0f, s1 = 0.0f, s2 = 0.0f;
     for (int k = 0; k < n_states; ++k) {
-        b0[k] *= p_mismatch[m0[k]];
-        b1[k] *= p_mismatch[m1[k]];
-        b2[k] *= p_mismatch[m2[k]];
         s0 += b0[k];
         s1 += b1[k];
         s2 += b2[k];
@@ -66,6 +81,7 @@ void hmm_bwd_update3(float *bwd[3], float p_switch, const float p_mismatch[2], c
     float scale0 = (1.0f - p_switch) / s0;
     float scale1 = (1.0f - p_switch) / s1;
     float scale2 = (1.0f - p_switch) / s2;
+    #pragma omp simd
     for (int k = 0; k < n_states; ++k) {
         b0[k] = scale0 * b0[k] + shift;
         b1[k] = scale1 * b1[k] + shift;
