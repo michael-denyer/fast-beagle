@@ -102,6 +102,7 @@ step full cases cases python3 tests/check_cases.py
 step full core jcompat make check-jcompat
 step core tracker make check-tracker
 step core interval make check-interval
+step core markers make check-markers
 step core block-reader make check-block-reader
 step core snv-perms make check-snv-perms
 step full java oracle-jar tests/check-oracle.sh java -ea -jar data/beagle.27Feb25.75f.jar
