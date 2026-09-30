@@ -26,7 +26,7 @@ void basic_phase_states_init(basic_phase_states *bps, const pbwt_phase_ibs *ibs,
     bps->max_states = max_states;
     int ceil_steps = jnum_d2i(ceil((double)(1.0f / fpd->ibs_step)));
     bps->min_steps = ceil_steps > 200 ? ceil_steps : 200;
-    comp_hap_tracker_init(&bps->t, max_states);
+    comp_hap_tracker_init(&bps->t, max_states, ibs->cs->n_haps);
     bps->comp_haps = util_malloc((size_t)max_states * sizeof *bps->comp_haps);
     for (int j = 0; j < max_states; ++j) bps->comp_haps[j] = bit_array_new((size_t)fpd->stage1_hap_bits[fpd->n_stage1]);
     bps->column = util_malloc((size_t)max_states * sizeof *bps->column);
