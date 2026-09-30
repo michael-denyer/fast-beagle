@@ -5,6 +5,7 @@
 # build/check-<name>.log, or build/check-c-<name>.log in the C tier.
 #
 # Usage: [GATE_TIER=c] [GATE_GROUP=<group>] [GATE_FUZZ=random] [GATE_LIST=1]
+#   [GATE_LIST_GROUPS=1 GATE_PLATFORM=darwin|linux]
 #   tests/gate-steps.sh <root>
 # Needs Java 21, htslib and uv; the full tier also needs PLINK2 naming the
 # pinned plink2 binary (see tests/check-bgen.sh). GATE_TIER=c runs only the checks that compare the C
@@ -16,9 +17,10 @@
 # examples. The default is the full gate. GATE_FUZZ=random fuzzes new examples
 # instead of the fixed 200.
 #
-# Each check names its group. GATE_GROUP=core, bgen, java, cases, sanitizers
-# or tsan runs one group, so CI can run the groups as parallel jobs; the setup
-# checks (the fixtures and the C build) run in every group. The default, all,
+# Each check names its group. GATE_GROUP selects one declared group, so CI can
+# run the groups as parallel jobs; the setup checks run in every selected group.
+# GATE_LIST_GROUPS=1 lists runnable, non-setup groups for an explicit tier and
+# platform without creating files. The default, all,
 # runs every check in order. The tsan check runs on macOS only and prints a
 # skip line elsewhere. GATE_LIST=1 prints the group and name of each check the
 # tier and group select, without running it.
@@ -31,13 +33,15 @@ SEAMS="T1a T1b T1c T1d T2 T2b T3a T3b0 T3b1 T3b T3c T3d T4a T4b T4c T4d T5a T5b 
 # cases with per-thread hashes.
 THREAD_SEAMS="T3b0 T3b1 T3b T3c T3d T4a T4b T4c T4d"
 
-mkdir -p build
 fail=0
 tier=${GATE_TIER:-full}
 case $tier in full|c) ;; *) echo "GATE_TIER must be full or c, not $tier"; exit 2 ;; esac
 group=${GATE_GROUP:-all}
-case $group in all|core|bgen|java|cases|sanitizers|tsan) ;;
-  *) echo "GATE_GROUP must be all, core, bgen, java, cases, sanitizers or tsan, not $group"; exit 2 ;; esac
+list_groups=${GATE_LIST_GROUPS:-}
+platform=${GATE_PLATFORM:-}
+if [ "$list_groups" = 1 ]; then
+  case $platform in darwin|linux) ;; *) echo "GATE_PLATFORM must be darwin or linux when listing groups"; exit 2 ;; esac
+fi
 bgen_oracle=live logs=build/check-
 [ "$tier" = c ] && bgen_oracle=recorded logs=build/check-c-
 fuzz_args=(--examples 200)
@@ -49,6 +53,14 @@ esac
 in_group() { [ "$group" = all ] || [ "$1" = setup ] || [ "$1" = "$group" ]; }
 step() {  # group name command...
   local owner=$1 name=$2; shift 2
+  if [ "${discovering:-}" = 1 ]; then
+    [ "$owner" = setup ] || declared_groups+=("$owner")
+    return 0
+  fi
+  if [ "$owner" = tsan ] && [ "$(uname -s)" != Darwin ]; then
+    in_group "$owner" && [ "${GATE_LIST:-}" != 1 ] && echo "  skip  $name (macOS only)"
+    return 0
+  fi
   in_group "$owner" || return 0
   if [ "${GATE_LIST:-}" = 1 ]; then echo "$owner $name"; return 0; fi
   if "$@" > "$logs$name.log" 2>&1; then
@@ -57,10 +69,26 @@ step() {  # group name command...
     echo "  FAIL  $name ($logs$name.log)"; fail=1
   fi
 }
+planned_step() {  # platform group name command...; platform constrains CI planning only
+  local planned_platform=$1; shift
+  if [ "${discovering:-}" = 1 ] && [ -n "${plan_platform:-}" ] &&
+     [ "$planned_platform" != "$plan_platform" ]; then
+    return 0
+  fi
+  step "$@"
+}
 full_step() {  # group name command...: runs only in the full tier
   if [ "$tier" = full ]; then
     step "$@"
-  elif in_group "$1" && [ "${GATE_LIST:-}" != 1 ]; then
+  elif [ "${discovering:-}" != 1 ] && in_group "$1" && [ "${GATE_LIST:-}" != 1 ]; then
+    echo "  skip  $2 (full tier only)"
+  fi
+}
+planned_full_step() {  # platform group name command...; platform constrains CI planning only
+  local planned_platform=$1; shift
+  if [ "$tier" = full ]; then
+    planned_step "$planned_platform" "$@"
+  elif [ "${discovering:-}" != 1 ] && in_group "$1" && [ "${GATE_LIST:-}" != 1 ]; then
     echo "  skip  $2 (full tier only)"
   fi
 }
@@ -87,10 +115,11 @@ trace_threads() {
   done
 }
 
+checks() {
 step setup fixtures tests/fetch-fixtures.sh --ensure
 step core gate-tier tests/check-gate-tier.sh
 step core log-recording python3 tests/check_log_recording.py
-full_step cases cases python3 tests/check_cases.py
+planned_full_step linux cases cases python3 tests/check_cases.py
 full_step core jcompat make check-jcompat
 step core tracker make check-tracker
 step core interval make check-interval
@@ -105,6 +134,7 @@ full_step java java-trace make java-trace
 full_step java oracle-trace oracle_trace
 step setup c-build make build/beagle
 step core oracle-c tests/check-oracle.sh build/beagle
+step core gate-planning tests/check-gate-planning.sh
 step core failures-c tests/check-failures.sh build/beagle
 step core output-failures python3 tests/check_output_failures.py build/beagle
 step core log-c tests/check-log.sh build/beagle
@@ -118,15 +148,46 @@ step bgen bgen env BGEN_ORACLE="$bgen_oracle" tests/check-bgen.sh
 # shellcheck disable=SC2086  # the seam list splits into arguments
 full_step java trace tests/check-trace.sh $SEAMS
 step sanitizers sanitizers tests/check-sanitizers.sh
-if [ "$(uname -s)" = Darwin ]; then
-  step tsan tsan tests/check-tsan.sh
-elif in_group tsan && [ "${GATE_LIST:-}" != 1 ]; then
-  echo "  skip  tsan (macOS only)"
-fi
+planned_step darwin tsan tsan tests/check-tsan.sh
 full_step core tla tests/check-tla.sh
 full_step core fuzz uv run --python 3.12 --script tests/check_fuzz.py "${fuzz_args[@]}"
 if [ "$tier" = c ]; then
   step core fuzz-regressions uv run --python 3.12 --script tests/check_fuzz.py --examples 0 --invalid-examples 0
 fi
 full_step java trace-threads trace_threads
+}
+
+# Discover group names by evaluating the check declarations in dry-run mode.
+# This keeps selector validation and CI planning tied to the declarations
+# above, including checks added later such as PR-only checks.
+declared_groups=()
+declaring_tier=$tier
+tier=full
+discovering=1
+checks
+discovering=
+tier=$declaring_tier
+known_groups=" ${declared_groups[*]} "
+if [ "$group" != all ] && [[ "$known_groups" != *" $group "* ]]; then
+  echo "GATE_GROUP '$group' is not declared by tests/gate-steps.sh" >&2
+  exit 2
+fi
+
+if [ "$list_groups" = 1 ]; then
+  declared_groups=()
+  plan_platform=$platform
+  tier=$declaring_tier
+  discovering=1
+  checks
+  seen_groups=" "
+  for owner in "${declared_groups[@]}"; do
+    [[ "$seen_groups" == *" $owner "* ]] && continue
+    printf '%s\n' "$owner"
+    seen_groups+="$owner "
+  done
+  exit 0
+fi
+
+mkdir -p build
+checks
 exit $fail
