@@ -20,17 +20,6 @@ float hmm_fwd_update(const float *prev, float *fwd, float fwd_sum, float p_switc
     return fwd_sum;
 }
 
-void hmm_bwd_update(float *bwd, float p_switch, const float p_mismatch[2], const uint8_t *mismatch, int n_states) {
-    float sum = 0.0f;
-    for (int k = 0; k < n_states; ++k) {
-        bwd[k] *= p_mismatch[mismatch[k]];
-        sum += bwd[k];
-    }
-    float shift = p_switch / n_states;
-    float scale = (1.0f - p_switch) / sum;
-    for (int k = 0; k < n_states; ++k) bwd[k] = scale * bwd[k] + shift;
-}
-
 /* The steps below compute each state's value in loops with no sum, which the
  * compiler can vectorise, and then add the values in state order. `omp simd`
  * states that a value loop's iterations are independent, so GCC at -O2
