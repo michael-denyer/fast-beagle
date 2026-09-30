@@ -111,6 +111,7 @@ step core log-c tests/check-log.sh build/beagle
 step core piece-size make check-piece-size
 step core bgen-unit make check-bgen-unit
 step core records make check-records
+step core run-outputs make check-run-outputs
 step core vcf-index make check-vcf-index
 step core tbi make check-tbi
 step bgen bgen env BGEN_ORACLE="$bgen_oracle" tests/check-bgen.sh

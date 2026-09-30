@@ -133,10 +133,10 @@ class OutputFailures(unittest.TestCase):
             target.write_bytes(gzip.compress(VCF.encode()))
             args = {"gt": target, "out": prefix, "window": 1, "overlap": 2}
             proc = run(args)
-            self.assertEqual(proc.returncode, 1)
+            self.assertEqual(proc.returncode, 1, proc.stderr)
             self.assertEqual(proc.stderr.strip(), f"ERROR: VCF output file equals input file: {target}")
             proc = run({**args, "unknown": 1})
-            self.assertEqual(proc.returncode, 1)
+            self.assertEqual(proc.returncode, 1, proc.stderr)
             self.assertEqual(proc.stderr.strip(), "Error: unrecognized parameter: unknown=1")
             self.assertEqual(gzip.decompress(target.read_bytes()).decode(), VCF)
             self.assertFalse(Path(str(prefix) + ".log").exists())
@@ -156,7 +156,7 @@ class OutputFailures(unittest.TestCase):
                         sample.write_text("untouched sample\n")
                     index.write_text("untouched index\n")
                     proc = run({"gt": target, "out": prefix, "bgen": mode, "tbi": "true"})
-                    self.assertEqual(proc.returncode, 1)
+                    self.assertEqual(proc.returncode, 1, proc.stderr)
                     self.assertEqual(proc.stderr.strip(), f"Error opening {prefix}{blocked}")
                     self.assertEqual(Path(str(prefix) + ".log").read_text().splitlines()[-1], proc.stderr.strip())
                     self.assertFalse(Path(str(prefix) + ".bgen").exists())
@@ -171,10 +171,7 @@ class OutputFailures(unittest.TestCase):
                         self.assertEqual(index.read_text(), "untouched index\n")
 
     def test_read_ahead_bgen_error_order(self):
-        header = (
-            "##fileformat=VCFv4.2\n"
-            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tS1\tS2\n"
-        )
+        header = "##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tS1\tS2\n"
 
         def rec(chrom, pos, last="1|0"):
             return f"{chrom}\t{pos}\t.\tA\tC\t.\t.\t.\tGT\t0|1\t{last}\n"
@@ -184,7 +181,9 @@ class OutputFailures(unittest.TestCase):
                 with self.subTest(source=source, mode=mode), tempfile.TemporaryDirectory() as tmp:
                     root = Path(tmp)
                     target = root / "target.vcf"
-                    target.write_text(header + rec(1, 100) + rec(2, 100) + rec(2, 200, "1|x" if source == "target" else "1|0"))
+                    target.write_text(
+                        header + rec(1, 100) + rec(2, 100) + rec(2, 200, "1|x" if source == "target" else "1|0")
+                    )
                     prefix = root / "result"
                     sample = Path(str(prefix) + ".sample")
                     sample.write_text("untouched sample\n")
@@ -194,14 +193,15 @@ class OutputFailures(unittest.TestCase):
                     if source == "reference":
                         reference = root / "reference.vcf"
                         reference.write_text(
-                            header + rec(1, 100)
+                            header
+                            + rec(1, 100)
                             + "".join(rec(2, pos) for pos in range(100, 100000, 100))
                             + "".join(rec(3, pos, "1|x" if pos == 5000 else "1|0") for pos in range(100, 10100, 100))
                         )
                         args["ref"] = reference
                     proc = run(args)
                     error = "java.lang.IllegalArgumentException: Window has only one position: CHROM=1 POS=100"
-                    self.assertEqual(proc.returncode, 1)
+                    self.assertEqual(proc.returncode, 1, proc.stderr)
                     self.assertEqual(proc.stderr.strip(), error)
                     self.assertEqual(Path(str(prefix) + ".log").read_text().splitlines()[-1], error)
                     self.assertFalse(Path(str(prefix) + ".bgen").exists())
@@ -226,6 +226,20 @@ class OutputFailures(unittest.TestCase):
             self.assertNotIn("Sanitizer", proc.stderr)
             for suffix in (".bgen", ".info", ".sample"):
                 self.assertFalse(Path(str(prefix) + suffix).exists(), f"partial {suffix}")
+
+    @unittest.skipUnless(Path("/dev/full").exists(), "requires Linux /dev/full")
+    def test_completed_bgen_survives_log_close_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "target.vcf"
+            target.write_text(VCF)
+            prefix = root / "result"
+            Path(str(prefix) + ".log").symlink_to("/dev/full")
+            proc = run({"gt": target, "out": prefix, "bgen": "phased", "tbi": "true"})
+            self.assertEqual(proc.returncode, 1, proc.stderr)
+            self.assertEqual(proc.stderr.strip(), f"Error writing {prefix}.log")
+            for suffix in (".bgen", ".info", ".sample", ".vcf.gz", ".vcf.gz.tbi"):
+                self.assertGreater(Path(str(prefix) + suffix).stat().st_size, 0, suffix)
 
 
 if __name__ == "__main__":

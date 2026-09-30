@@ -58,6 +58,7 @@ The imputation writer splits a long cluster into work items of at most `PIECE_RE
 - `src/beagleutil/comp_hap_queue.c`: the composite haplotype tracker.
 - `src/bgen/`: the BGEN writer for `bgen=plink2` and `bgen=phased` ([BGEN output](usage.md#bgen-output)).
 - `src/main/vcf_index.c`: the tabix index writer for `tbi=true`.
+- `src/main/run_outputs.c`: the output destinations, collision checks and BGEN failure cleanup. Main creates this owner before the readers start and releases it after they join. Writers borrow its paths and keep their format encoding and close operations. BGEN creation and registration share a lock with terminal cleanup, which prevents later opens from recreating removed files. A caught read-ahead error leaves outputs writable until the consumer raises the fatal error.
 - `third_party/libdeflate/`: the files of libdeflate 1.25 (MIT, `COPYING`) that zlib compression needs. They come from plink2's source tree at tag v2.0.0-a.7.8. plink2 compresses BGEN with this library at level 6. zlib's own deflate gives different bytes.
 - `java/src/`: the unmodified Beagle 5.5 Java source, used as the oracle.
 - `java/trace.patch`: trace hooks for the Java source ([trace seams](testing.md#compare-trace-seams)).
