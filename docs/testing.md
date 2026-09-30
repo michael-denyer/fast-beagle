@@ -73,7 +73,7 @@ Every log run must also pass its recorded exit and VCF hash checks. Recording st
 - a one-character non-ASCII GT allele
 - a bref3 SNV allele code whose permutation index is negative
 - a bref3 header whose sample count overflows when doubled. This case runs for the C build only, because the jar's result depends on its heap size.
-- a first window that MarkerMap rejects, followed by a malformed target or reference line in the second window. fast-beagle reads the second window while it phases the first, and must report the first window's error. These cases run for the C build only, because the jar reports the malformed line, at startup or depending on thread timing ([divergences](beagle-divergences.md)).
+- a first window that MarkerMap rejects, followed by a malformed target or reference line, duplicate marker or invalid marker order in the second window. fast-beagle reads the second window while it phases the first, and must report only the first window's error. These cases run for the C build only, because the jar reports the malformed line, at startup or depending on thread timing ([divergences](beagle-divergences.md)).
 
 `tests/check_output_failures.py build/beagle` checks that log, VCF, BGEN and tabix destinations refuse collisions with input files before writing. It covers both BGEN modes, the tabix index, relative paths, symbolic links and hard links. It also checks that disabled outputs do not cause refusals, that nonfinite phased BGEN probabilities fail with a message and leave no BGEN files, and that a large `ne=` saturates the reported population size as Java does. The gate runs these checks normally and under the sanitizers, with leak detection off for the expected failures.
 
@@ -94,6 +94,7 @@ The check builds `build/beagle-piece1` with one marker per work item. It runs `b
 
 - `make check-jcompat` compares each Java library reproduction in `src/jcompat/` against output printed by real Java (`tests/jcompat/JcompatFixtures.java`), including DecimalFormat's NaN and infinity output.
 - `make check-interval` tests `src/vcf/interval_it.c` over an in-memory record source (`tests/vcf/interval_it_test.c`).
+- `make check-markers` requires duplicate-marker and marker-order errors to return through `util_try` with their original messages, so the read-ahead reader can defer them (`tests/vcf/markers_test.c`).
 - `make check-block-reader` forces a published batch to be consumed and refilled with EOF before the parser resumes. The parser must still publish the EOF sentinel (`tests/vcf/block_reader_test.c`).
 - `make check-records`: `tests/output/record_fixture.c` writes phased, imputed, genotyped, haploid and multiallelic records through the window writer with no BGEN and in both `bgen=` modes. `tests/check_records.py` requires the same VCF from all three runs and the expected VCF fields. It also requires phased BGEN probabilities captured before the VCF rounds them.
 - `make check-tracker` tests the composite haplotype tracker in `src/beagleutil/comp_hap_queue.c` through the interface every caller uses (`tests/beagleutil/tracker_test.c`).
