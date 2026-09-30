@@ -1,92 +1,60 @@
 #!/bin/bash
-# Checks group planning against the declared check groups and CI's platform
-# split. Planning must be read-only, including when asked about another OS.
+# Checks the groups CI builds its job matrix from, and that each check's
+# declared tier and macos attribute decide where it runs.
 set -uo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
 fail=0
 
-expect_groups() {  # tier platform expected groups...
-  local tier=$1 platform=$2 got want; shift 2
-  want=$(printf '%s\n' "$@")
-  got=$(GATE_LIST_GROUPS=1 GATE_TIER="$tier" GATE_PLATFORM="$platform" \
-    "$ROOT/tests/gate-steps.sh" "$ROOT")
-  if [ "$got" = "$want" ]; then
-    echo "PASS $tier/$platform groups"
+expect() {  # label got want
+  if [ "$2" = "$3" ]; then
+    echo "PASS $1"
   else
-    echo "FAIL $tier/$platform groups: got '$got', want '$want'"; fail=1
+    echo "FAIL $1: got '$2', want '$3'"; fail=1
   fi
 }
+gate() {  # root VAR=value...
+  local root=$1; shift
+  env "$@" "$root/tests/gate-steps.sh" "$root"
+}
 
-expect_groups full linux core cases java bgen sanitizers
-expect_groups full darwin core java bgen sanitizers tsan
-expect_groups c linux core bgen sanitizers
-expect_groups c darwin core bgen sanitizers tsan
+expect "full-tier groups" "$(gate "$ROOT" GATE_LIST_GROUPS=1 GATE_TIER=full)" \
+  $'core\ncases\njava\nbgen\nsanitizers\ntsan'
+expect "C-tier groups" "$(gate "$ROOT" GATE_LIST_GROUPS=1 GATE_TIER=c)" \
+  $'core\nbgen\nsanitizers\ntsan'
+expect "undeclared group rejected" \
+  "$(gate "$ROOT" GATE_GROUP=not-a-group GATE_LIST=1 > /dev/null 2>&1; echo $?)" 2
+expect "full-only group is a C-tier no-op" "$(gate "$ROOT" GATE_TIER=c GATE_GROUP=java GATE_LIST=1)" \
+  $'setup fixtures\nsetup c-build'
+expect "setup and selected checks keep declaration order" \
+  "$(gate "$ROOT" GATE_TIER=full GATE_GROUP=bgen GATE_LIST=1)" $'setup fixtures\nsetup c-build\nbgen bgen'
 
-tmp=$(mktemp -d)
-mkdir "$tmp/tests"
-ln -s "$ROOT/tests/gate-steps.sh" "$tmp/tests/gate-steps.sh"
-if GATE_LIST_GROUPS=1 GATE_TIER=full GATE_PLATFORM=darwin \
-    "$tmp/tests/gate-steps.sh" "$tmp" > "$tmp/groups" && [ ! -e "$tmp/build" ]; then
-  echo "PASS group listing is read-only"
-else
-  echo "FAIL group listing created files or failed"; fail=1
-fi
-if GATE_LIST_GROUPS=1 GATE_TIER=full GATE_PLATFORM=unsupported \
-    "$ROOT/tests/gate-steps.sh" "$ROOT" > /dev/null 2>&1; then
-  echo "FAIL invalid planning platform passed"; fail=1
-else
-  echo "PASS invalid planning platform rejected"
-fi
+mkdir -p "$tmp/read-only/tests"
+ln -s "$ROOT/tests/gate-steps.sh" "$tmp/read-only/tests/gate-steps.sh"
+expect "group listing succeeds and creates no files" \
+  "$(gate "$tmp/read-only" GATE_LIST_GROUPS=1 > /dev/null; echo $?) $(ls -A "$tmp/read-only")" "0 tests"
 
-if GATE_TIER=full GATE_GROUP=not-a-group GATE_LIST=1 \
-    "$ROOT/tests/gate-steps.sh" "$ROOT" > /dev/null 2>&1; then
-  echo "FAIL undeclared group selector passed"; fail=1
-else
-  echo "PASS undeclared group selector rejected"
-fi
+# A fixture with a C-only group and a macOS-only check outside the tsan group.
+mkdir -p "$tmp/fixture/tests" "$tmp/linux" "$tmp/darwin"
+sed -e 's/^step c core fuzz-regressions /step c c-only fuzz-regressions /' \
+    -e 's/^step macos tsan tsan /step macos core tsan /' \
+  "$ROOT/tests/gate-steps.sh" > "$tmp/fixture/tests/gate-steps.sh"
+chmod +x "$tmp/fixture/tests/gate-steps.sh"
+printf '#!/bin/sh\necho Linux\n' > "$tmp/linux/uname"
+printf '#!/bin/sh\necho Darwin\n' > "$tmp/darwin/uname"
+chmod +x "$tmp/linux/uname" "$tmp/darwin/uname"
 
-got=$(GATE_TIER=c GATE_GROUP=java GATE_LIST=1 "$ROOT/tests/gate-steps.sh" "$ROOT")
-want=$'setup fixtures\nsetup c-build'
-if [ "$got" = "$want" ]; then
-  echo "PASS full-only group is a C-tier no-op"
-else
-  echo "FAIL full-only C-tier group selected checks: got '$got', want '$want'"; fail=1
-fi
-
-got=$(GATE_TIER=full GATE_GROUP=bgen GATE_LIST=1 "$ROOT/tests/gate-steps.sh" "$ROOT")
-want=$'setup fixtures\nsetup c-build\nbgen bgen'
-if [ "$got" = "$want" ]; then
-  echo "PASS setup and selected checks retain declaration order"
-else
-  echo "FAIL selected check list: got '$got', want '$want'"; fail=1
-fi
-
-got=$(GATE_TIER=full GATE_GROUP=core GATE_LIST=1 "$ROOT/tests/gate-steps.sh" "$ROOT" \
-  | awk '$2 == "oracle-c" || $2 == "gate-planning" || $2 == "failures-c"')
-want=$'core oracle-c\ncore gate-planning\ncore failures-c'
-if [ "$got" = "$want" ]; then
-  echo "PASS local core check order and planner membership"
-else
-  echo "FAIL local core membership/order: got '$got', want '$want'"; fail=1
-fi
-
-# CI combines Linux then macOS plans so Linux-only cases and macOS-only tsan
-# each occur once, in declaration order.
-for tier in full c; do
-  got=$( { GATE_LIST_GROUPS=1 GATE_TIER="$tier" GATE_PLATFORM=linux "$ROOT/tests/gate-steps.sh" "$ROOT"
-           GATE_LIST_GROUPS=1 GATE_TIER="$tier" GATE_PLATFORM=darwin "$ROOT/tests/gate-steps.sh" "$ROOT"; } \
-         | awk '!seen[$0]++')
-  if [ "$tier" = full ]; then
-    want=$'core\ncases\njava\nbgen\nsanitizers\ntsan'
-  else
-    want=$'core\nbgen\nsanitizers\ntsan'
-  fi
-  if [ "$got" = "$want" ]; then
-    echo "PASS CI $tier matrix covers platform-specific groups in declaration order"
-  else
-    echo "FAIL CI $tier matrix: got '$got', want '$want'"; fail=1
-  fi
-done
-
-rm -rf "$tmp"
+expect "C-only group is planned in the C tier" "$(gate "$tmp/fixture" GATE_LIST_GROUPS=1 GATE_TIER=c)" \
+  $'core\nbgen\nsanitizers\nc-only'
+expect "C-only group is not planned in the full tier" "$(gate "$tmp/fixture" GATE_LIST_GROUPS=1 GATE_TIER=full)" \
+  $'core\ncases\njava\nbgen\nsanitizers'
+expect "C-only group runs in the C tier" "$(gate "$tmp/fixture" GATE_TIER=c GATE_GROUP=c-only GATE_LIST=1)" \
+  $'setup fixtures\nsetup c-build\nc-only fuzz-regressions'
+expect "C-only group is a full-tier no-op" "$(gate "$tmp/fixture" GATE_TIER=full GATE_GROUP=c-only GATE_LIST=1)" \
+  $'setup fixtures\nsetup c-build'
+expect "macos check skipped off macOS" \
+  "$(gate "$tmp/fixture" PATH="$tmp/linux:$PATH" GATE_GROUP=core GATE_LIST=1 | awk '$2 == "tsan"')" ""
+expect "macos check runs on macOS" \
+  "$(gate "$tmp/fixture" PATH="$tmp/darwin:$PATH" GATE_GROUP=core GATE_LIST=1 | awk '$2 == "tsan"')" "core tsan"
 exit "$fail"

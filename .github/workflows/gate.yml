@@ -63,14 +63,12 @@ jobs:
                 --jq '.workflow_runs[0].head_sha // ""')
               if [ "$last" = "$SHA" ]; then run=false; fi ;;
           esac
-          # Derive the matrix from declared checks. Cases run on Linux only;
-          # ThreadSanitizer runs on macOS only. Concatenating Linux first keeps
-          # the declaration order while retaining groups for both runners.
+          # The matrix takes its groups from the check declarations. The none
+          # tier skips the check job, so any valid tier keeps the matrix well formed.
           plan_tier=$tier
           [ "$plan_tier" != none ] || plan_tier=full
-          groups=$( { GATE_LIST_GROUPS=1 GATE_TIER="$plan_tier" GATE_PLATFORM=linux tests/gate-steps.sh .
-                      GATE_LIST_GROUPS=1 GATE_TIER="$plan_tier" GATE_PLATFORM=darwin tests/gate-steps.sh .; } \
-                    | awk '!seen[$0]++' | jq -Rsc 'split("\n") | map(select(length > 0))')
+          groups=$(GATE_LIST_GROUPS=1 GATE_TIER="$plan_tier" tests/gate-steps.sh . \
+                   | jq -Rsc 'split("\n") | map(select(length > 0))')
           echo "run=$run tier=$tier fuzz=$fuzz groups=$groups"
           { echo "run=$run"; echo "tier=$tier"; echo "fuzz=$fuzz"; echo "groups=$groups"; } >> "$GITHUB_OUTPUT"
 

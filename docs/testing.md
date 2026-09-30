@@ -196,7 +196,7 @@ The model represents condition-variable waits with wait sets and spurious wakeup
 
 The script has two tiers. The full tier, the default, runs every check. `GATE_TIER=c` runs the C tier, which compares `build/beagle` against recorded results only. Java then only builds the bref3 fixtures. The C tier skips every check that runs Java or the jar next to the C binary (`jcompat`, `oracle-jar`, `failures-jar`, `java-build`, `oracle-source`, `java-trace`, `oracle-trace`, `log-jar`, `trace`, `fuzz` and `trace-threads`), the fixture-cache check `cases` and the TLA+ model check. It runs the [sanitizers](#sanitizers). Its `bgen` step checks the BGEN output against `tests/bgen-hashes.txt` instead of plink2 ([recorded hashes](#recorded-bgen-hashes)). It runs the saved fuzz regressions in `tests/fuzz-regressions/` as `fuzz-regressions`. It prints a `skip` line for each check it leaves out. `GATE_FUZZ=random` makes the full tier fuzz 200 new examples instead of the fixed 200.
 
-Each check belongs to one group, so CI can run the groups as parallel jobs. `GATE_GROUP` selects a declared group. The default, `all`, runs every check in order. `GATE_LIST_GROUPS=1 GATE_TIER=full|c GATE_PLATFORM=darwin|linux` lists distinct runnable groups in declaration order without running checks or creating files. CI combines the Linux and macOS lists, then keeps `cases` on Linux and `tsan` on macOS.
+Each check belongs to one group, so CI can run the groups as parallel jobs. `GATE_GROUP` selects a declared group. The default, `all`, runs every check in order. `GATE_LIST_GROUPS=1` prints, in declaration order, each group other than `setup` that has a check in the tier. It runs no checks, creates no files, and prints the same list on every OS. CI builds its job matrix from that list. A check can be limited to one tier (`full` or `c`) or to macOS (`macos`) where it is declared in `tests/gate-steps.sh`.
 
 | Group | Checks |
 | --- | --- |
@@ -208,7 +208,7 @@ Each check belongs to one group, so CI can run the groups as parallel jobs. `GAT
 | `sanitizers` | `sanitizers`, which builds its own binaries in `build/san` |
 | `tsan` | `tsan`, which builds its own binary in `build/tsan`. It runs on macOS only and prints a `skip` line elsewhere. |
 
-`GATE_LIST=1` prints the group and name of each check that the tier and group select, and runs none of them. `tests/check-gate-planning.sh` checks all four tier/platform plans, selector validation, setup membership, ordering and CI's derived matrix.
+`GATE_LIST=1` prints the group and name of each check that the tier and group select, and runs none of them. `tests/check-gate-planning.sh` checks both tiers' group lists, selector validation, setup membership and ordering. On a copy of `tests/gate-steps.sh` it also checks that a C-only group is planned and accepted in the C tier only, and that a `macos` check is skipped off macOS whatever its group.
 
 `tests/check-local.sh` is the pre-merge gate. It runs the lint hooks once, then every check in `tests/gate-steps.sh` natively and on Linux x86_64 in docker. On each platform it runs the full tier, then the C tier without plink2, as CI runs it on pull requests. It prints one pass or fail line per check. The C tier writes its logs to `build/check-c-<name>.log`.
 
