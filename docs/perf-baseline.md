@@ -22,7 +22,7 @@ This run imputed one chromosome for about 100,000 target samples and wrote about
 | CPU time | 30,420 s | 13,499 s | 2.3× less |
 | Max memory | 296.4 GB | 84.3 GB | 3.5× less |
 
-The C binary was built with GCC 13.3 and linked against Ubuntu 24.04's shared htslib, which uses libdeflate. On 2026-09-30, commit `9e4be51` built the same way took 291 s. A static build of that commit with htslib linked against zlib alone took 338 s and 16,685 s of CPU time. `release/build-static.sh` links libdeflate for this reason.
+The C binary was built with GCC 13.3 and linked against Ubuntu 24.04's shared htslib, which uses libdeflate. On 2026-09-30, commit `9e4be51` built the same way took 291 s and 13,831 s of CPU time. A static build of that commit with htslib linked against zlib alone took 338 s and 16,685 s. The static release build from `release/build-static.sh`, which links htslib against libdeflate 1.25, took 255 s and 12,337 s at commit `d097133`, whose source matches `9e4be51`. Each figure is one run, and all three wrote the same VCF.
 
 The C run did not write a tabix index. With `tbi=true`, the same step took 346 s and 16,194 s of CPU time at the same max memory, and it replaced a separate `tabix -p vcf` pass.
 
