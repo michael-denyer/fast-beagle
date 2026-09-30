@@ -56,7 +56,7 @@ For each example, both tools must succeed with the same VCF hash, or both must f
 
 The invalid-parameter examples change one parameter of a generated input so that Beagle rejects it. There are 42 changes: `out` naming an input or a directory, 15 `window` and `overlap` pairs, 21 values out of bounds or not numbers, and an unknown parameter. Both tools must exit 1 with the same message, and the input files must stay unchanged. Java may prefix the message with the exception class.
 
-The full gate runs a fixed set of 200 examples and 2 examples per invalid-parameter change, and the nightly CI run fuzzes 200 new examples. Each directory in `tests/fuzz-regressions/` runs first. It holds one input today, `window-stall`.
+The full gate runs a fixed set of 200 examples and 2 examples per invalid-parameter change, and the nightly CI run fuzzes 1000 new examples on each runner. Each directory in `tests/fuzz-regressions/` runs first. It holds one input today, `window-stall`.
 
 ### Refused inputs
 
