@@ -12,18 +12,32 @@
 #include <stdlib.h>
 
 #include "blbutil/line_reader.h"
+#include "blbutil/parallel.h"
 #include "blbutil/trace.h"
 #include "blbutil/utilities.h"
+#include "jcompat/jutf8.h"
 #include "vcf/filter_util.h"
 #include "vcf/gt_rec.h"
 #include "vcf/vcf_header.h"
+
+/* VcfIt.DEFAULT_BUFFER_SIZE: lines parsed together on the worker threads. */
+#define VCF_IT_BATCH 1024
 
 typedef struct {
     line_reader *reader;
     vcf_header header;
     const str_set *exclude;
+    int n_threads;
     kstring_t line;
-    bool have_line;     /* line holds the next unparsed data line */
+    bool have_line;     /* line holds the next unread data line */
+    /* The batch: recs[next..n) are not yet returned. A parse error, and an
+     * error reading the lines after lines[n - 1], are raised when the record
+     * they follow is returned, as when each line was parsed on demand. */
+    kstring_t lines[VCF_IT_BATCH];
+    gt_rec *recs[VCF_IT_BATCH];
+    char *errors[VCF_IT_BATCH];
+    char *read_error;
+    int n, next;
 } vcf_it;
 
 void vcf_it_trace_marker(const char *seam, const marker *m) {
@@ -40,11 +54,12 @@ static bool is_blank(const kstring_t *s) {
     return true;
 }
 
+/* Lines are sanitised on the parse workers; a blank line is blank either way. */
 static void read_line(vcf_it *it) {
-    it->have_line = line_reader_next(it->reader, &it->line);
+    it->have_line = line_reader_next_raw(it->reader, &it->line);
     kstring_t probe = {0, 0, NULL};
     while (it->have_line && is_blank(&it->line)) {
-        if (!line_reader_next(it->reader, &probe)) break;
+        if (!line_reader_next_raw(it->reader, &probe)) break;
         kstring_t tmp = it->line;
         it->line = probe;
         probe = tmp;
@@ -66,21 +81,62 @@ static void trace_rec(const gt_rec *rec) {
     free(s.s);
 }
 
+static void read_lines(void *self) {
+    vcf_it *it = self;
+    while (it->n < VCF_IT_BATCH && it->have_line) {
+        kstring_t t = it->lines[it->n];
+        it->lines[it->n++] = it->line;
+        it->line = t;
+        read_line(it);
+    }
+}
+
+typedef struct {
+    vcf_it *it;
+    int j;
+} parse_ctx;
+
+static void parse_line(void *arg) {
+    const parse_ctx *c = arg;
+    kstring_t *line = &c->it->lines[c->j];
+    jutf8_sanitize(line);
+    gt_rec *rec = util_malloc(sizeof *rec);
+    gt_rec_parse(rec, line->s, line->l, &c->it->header);
+    rec->refs = 1;
+    c->it->recs[c->j] = rec;
+}
+
+static void parse_task(void *worker, int j) {
+    vcf_it *it = worker;
+    it->recs[j] = NULL;
+    it->errors[j] = util_try(parse_line, &(parse_ctx){it, j});
+}
+
+/* VcfIt.fillEmissionBuffer: reads a batch of lines and parses them in parallel. */
+static void fill_batch(vcf_it *it) {
+    it->n = it->next = 0;
+    it->read_error = util_try(read_lines, it);
+    parallel_for(parallel_threads(it->n_threads, it->n), it->n, it, 0, parse_task);
+}
+
 /* VcfIt.next: the next record that passes the marker filter. */
 static void *vcf_it_next(void *self) {
     vcf_it *it = self;
-    while (it->have_line) {
-        gt_rec *rec = util_malloc(sizeof *rec);
-        gt_rec_parse(rec, it->line.s, it->line.l, &it->header);
-        rec->refs = 1;
-        read_line(it);
+    for (;;) {
+        if (it->next == it->n) {
+            if (!it->have_line) return NULL;
+            fill_batch(it);
+        }
+        int j = it->next++;
+        if (it->errors[j] != NULL) util_exit("%s", it->errors[j]);
+        if (it->next == it->n && it->read_error != NULL) util_exit("%s", it->read_error);
+        gt_rec *rec = it->recs[j];
         if (filter_accept_marker(it->exclude, &rec->marker)) {
             if (trace_on()) trace_rec(rec);
             return rec;
         }
         gt_rec_release(rec);
     }
-    return NULL;
 }
 
 static const samples *vcf_it_samples(const void *self) {
@@ -90,6 +146,12 @@ static const samples *vcf_it_samples(const void *self) {
 
 static void vcf_it_close(void *self) {
     vcf_it *it = self;
+    for (int j = it->next; j < it->n; ++j) gt_rec_release(it->recs[j]);
+    for (int j = 0; j < VCF_IT_BATCH; ++j) {
+        free(it->lines[j].s);
+        free(it->errors[j]);
+    }
+    free(it->read_error);
     vcf_header_free(&it->header);
     free(it->line.s);
     line_reader_close(it->reader);
@@ -113,6 +175,7 @@ sample_file_it vcf_it_open(const char *path, const str_set *exclude_samples, con
     *it = (vcf_it){0};
     it->reader = line_reader_open(path, n_threads);
     it->exclude = exclude_markers;
+    it->n_threads = n_threads;
     vcf_header_read(&it->header, it->reader, &it->line, exclude_samples);
     it->have_line = true;
     if (trace_on()) vcf_header_trace(&it->header, "T1b-target");

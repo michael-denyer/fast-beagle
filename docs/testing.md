@@ -73,6 +73,7 @@ Every log run must also pass its recorded exit and VCF hash checks. Recording st
 - a one-character non-ASCII GT allele
 - a bref3 SNV allele code whose permutation index is negative
 - a bref3 header whose sample count overflows when doubled. This case runs for the C build only, because the jar's result depends on its heap size.
+- a first window that MarkerMap rejects, followed by a malformed target or reference line in the second window. fast-beagle reads the second window while it phases the first, and must report the first window's error. These cases run for the C build only, because the jar reports the malformed line, at startup or depending on thread timing ([divergences](beagle-divergences.md)).
 
 `tests/check_output_failures.py build/beagle` checks that log, VCF, BGEN and tabix destinations refuse collisions with input files before writing. It covers both BGEN modes, the tabix index, relative paths, symbolic links and hard links. It also checks that disabled outputs do not cause refusals, that nonfinite phased BGEN probabilities fail with a message and leave no BGEN files, and that a large `ne=` saturates the reported population size as Java does. The gate runs these checks normally and under the sanitizers, with leak detection off for the expected failures.
 
