@@ -21,7 +21,7 @@ rsync -a --delete --exclude build "$ROOT/Makefile" "$ROOT/java" "$ROOT/src" "$RO
 SAN_CFLAGS=${SAN_CFLAGS:-"-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined,float-cast-overflow -fno-sanitize-recover=all"}
 # make does not rebuild objects when only CFLAGS change.
 make -C "$SAN" clean > /dev/null
-make -C "$SAN" CFLAGS="$SAN_CFLAGS" build/beagle check-bgen-unit check-records check-tracker check-block-reader build/output/run_outputs_fixture \
+make -C "$SAN" CFLAGS="$SAN_CFLAGS" build/beagle check-bgen-unit check-records check-tracker check-block-reader build/output/bgen_files_fixture \
   > "$SAN/make.log" 2>&1 || { echo "FAIL sanitizer build or BGEN unit test ($SAN/make.log)"; exit 1; }
 echo "PASS sanitizer build and BGEN unit tests"
 
@@ -36,10 +36,10 @@ trap 'rm -rf "$OUT"' EXIT
 
 check_selection "$ROOT/tests/oracle-cases.txt" || exit 1
 fail=0
-if ASAN_OPTIONS=detect_leaks=0 python3 "$ROOT/tests/check_run_outputs.py" "$SAN/build/output/run_outputs_fixture"; then
-  echo "PASS sanitizer output ownership"
+if ASAN_OPTIONS=detect_leaks=0 python3 "$ROOT/tests/check_bgen_files.py" "$SAN/build/output/bgen_files_fixture"; then
+  echo "PASS sanitizer BGEN partial-file cleanup"
 else
-  echo "FAIL sanitizer output ownership"; fail=1
+  echo "FAIL sanitizer BGEN partial-file cleanup"; fail=1
 fi
 if ASAN_OPTIONS=detect_leaks=0 python3 "$ROOT/tests/check_output_failures.py" "$SAN/build/beagle"; then
   echo "PASS sanitizer output refusals"

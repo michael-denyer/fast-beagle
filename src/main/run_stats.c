@@ -100,9 +100,8 @@ static void print_nanos(run_stats *rs, const char *message, int64_t nanos) {
     duo_print(rs, "%-31s%s\n", message, elapsed(buf, sizeof buf, nanos));
 }
 
-void run_stats_open(run_stats *rs, const par *p, const run_outputs *out, const char *program) {
-    *rs = (run_stats){.par = p, .start_nanos = run_stats_nanos()};
-    rs->log_path = run_outputs_path(out, RUN_OUTPUT_LOG);
+void run_stats_open(run_stats *rs, const par *p, const char *log_path, const char *program) {
+    *rs = (run_stats){.par = p, .log_path = log_path, .start_nanos = run_stats_nanos()};
     rs->log = fopen(rs->log_path, "w");
     if (rs->log == NULL) util_exit("Error opening %s", rs->log_path);
     util_exit_log(rs->log);

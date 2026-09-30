@@ -249,7 +249,7 @@ static void write_line(window_writer *ww) {
     ww->line.l = 0;
 }
 
-void window_writer_open(window_writer *ww, const par *p, run_outputs *out, const samples *s) {
+void window_writer_open(window_writer *ww, const par *p, const run_outputs *out, const samples *s) {
     static pthread_once_t tables_once = PTHREAD_ONCE_INIT;
     pthread_once(&tables_once, init_tables);
     ww->samples = s;
@@ -305,7 +305,6 @@ void window_writer_open(window_writer *ww, const par *p, run_outputs *out, const
         kputs(s->ids[j], l);
     }
     write_line(ww);
-    if (p->tbi) run_outputs_invalidate_index(out);
     ww->index = p->tbi ? vcf_index_new(ww->path, run_outputs_path(out, RUN_OUTPUT_TBI), ww->n_written) : NULL;
 }
 

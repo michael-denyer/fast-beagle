@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "bgen/bgen_files.h"
 #include "blbutil/utilities.h"
 #include "main/run_outputs.h"
 
@@ -17,8 +18,8 @@ static void fail(void *arg) {
     util_exit("caught reader error");
 }
 
-static void write_member(run_bgen_file file, const char *text) {
-    FILE *stream = run_outputs_bgen_open(outputs, file);
+static void write_member(run_output_file file, const char *text) {
+    FILE *stream = bgen_files_open(run_outputs_path(outputs, file));
     if (stream == NULL) util_exit("fixture open failed");
     if (fputs(text, stream) == EOF || fclose(stream) != 0) util_exit("fixture write failed");
 }
@@ -29,14 +30,14 @@ static void *late_open(void *arg) {
     while (!resume) pthread_cond_wait(&changed, &mutex);
     pthread_mutex_unlock(&mutex);
     /* A completion notification during abort must not enable a new open. */
-    run_outputs_bgen_complete(outputs);
-    FILE *stream = run_outputs_bgen_open(outputs, RUN_BGEN_SAMPLE);
+    bgen_files_complete();
+    FILE *stream = bgen_files_open(run_outputs_path(outputs, RUN_OUTPUT_SAMPLE));
     reopened = stream != NULL;
     if (stream != NULL) fclose(stream);
     return NULL;
 }
 
-/* Registered before the owner, so it runs after the owner's exit cleanup. */
+/* Registered before the cleanup, so it runs after the cleanup. */
 static void after_cleanup(void) {
     pthread_mutex_lock(&mutex);
     resume = true;
@@ -57,9 +58,10 @@ int main(int argc, char **argv) {
     if (aborting) atexit(after_cleanup);
     par p = {.out = argv[2], .bgen = BGEN_PHASED};
     outputs = run_outputs_new(&p);
+    bgen_files_register_cleanup();
     if (aborting && pthread_create(&late_thread, NULL, late_open, NULL) != 0) return 2;
 
-    FILE *stream = run_outputs_bgen_open(outputs, RUN_BGEN_DATA);
+    FILE *stream = bgen_files_open(run_outputs_path(outputs, RUN_OUTPUT_BGEN));
     if (stream == NULL) return 2;
     if (strcmp(mode, "caught") == 0) {
         char *error = util_try(fail, NULL);
@@ -67,11 +69,11 @@ int main(int argc, char **argv) {
         free(error);
     }
     if (fputs("data after reader error\n", stream) == EOF || fclose(stream) != 0) return 2;
-    write_member(RUN_BGEN_INFO, "info\n");
+    write_member(RUN_OUTPUT_INFO, "info\n");
     if (strcmp(mode, "partial") == 0 || aborting) util_exit("fixture failure");
 
-    write_member(RUN_BGEN_SAMPLE, "sample\n");
-    run_outputs_bgen_complete(outputs);
+    write_member(RUN_OUTPUT_SAMPLE, "sample\n");
+    bgen_files_complete();
     if (strcmp(mode, "complete") == 0) util_exit("fixture failure");
     run_outputs_free(outputs);
     return 0;

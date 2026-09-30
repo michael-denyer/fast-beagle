@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "main/run_outputs.h"
 
-#include <pthread.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -12,21 +12,10 @@
 static const char *const suffixes[RUN_OUTPUT_COUNT] = {
     ".vcf.gz", ".log", ".bgen", ".info", ".sample", ".vcf.gz.tbi"
 };
-static const run_output_file bgen_files[] = {
-    RUN_OUTPUT_BGEN, RUN_OUTPUT_INFO, RUN_OUTPUT_SAMPLE
-};
 
 struct run_outputs {
     char *paths[RUN_OUTPUT_COUNT];
-    pthread_mutex_t mutex;
-    bool created[3];
-    enum { BGEN_WRITING, BGEN_COMPLETE, BGEN_ABORTED } state;
 };
-
-/* Published before readers start; cleared after they join. util_try catches
- * reader errors without exit(), so only terminal process exit runs this. */
-static run_outputs *active;
-static bool cleanup_registered;
 
 static bool enabled(const par *p, run_output_file file) {
     if (file == RUN_OUTPUT_TBI) return p->tbi;
@@ -83,30 +72,11 @@ void run_outputs_check(const par *p) {
         if (enabled(p, file)) check_file(p, file);
 }
 
-static void remove_partial(void) {
-    run_outputs *out = active;
-    if (out == NULL) return;
-    pthread_mutex_lock(&out->mutex);
-    bool partial = out->state == BGEN_WRITING;
-    out->state = BGEN_ABORTED;
-    if (partial) {
-        for (size_t j = 0; j < sizeof bgen_files / sizeof *bgen_files; ++j)
-            if (out->created[j]) remove(out->paths[bgen_files[j]]);
-    }
-    pthread_mutex_unlock(&out->mutex);
-}
-
 run_outputs *run_outputs_new(const par *p) {
     run_outputs *out = util_malloc(sizeof *out);
     *out = (run_outputs){0};
     for (run_output_file file = 0; file < RUN_OUTPUT_COUNT; ++file)
         if (enabled(p, file)) out->paths[file] = destination(p, file);
-    pthread_mutex_init(&out->mutex, NULL);
-    active = out;
-    if (!cleanup_registered) {
-        atexit(remove_partial);
-        cleanup_registered = true;
-    }
     return out;
 }
 
@@ -114,30 +84,7 @@ const char *run_outputs_path(const run_outputs *out, run_output_file file) {
     return out->paths[file];
 }
 
-FILE *run_outputs_bgen_open(run_outputs *out, run_bgen_file file) {
-    pthread_mutex_lock(&out->mutex);
-    FILE *stream = NULL;
-    if (out->state == BGEN_WRITING) {
-        stream = fopen(out->paths[bgen_files[file]], "wb");
-        if (stream != NULL) out->created[file] = true;
-    }
-    pthread_mutex_unlock(&out->mutex);
-    return stream;
-}
-
-void run_outputs_bgen_complete(run_outputs *out) {
-    pthread_mutex_lock(&out->mutex);
-    if (out->state == BGEN_WRITING) out->state = BGEN_COMPLETE;
-    pthread_mutex_unlock(&out->mutex);
-}
-
-void run_outputs_invalidate_index(run_outputs *out) {
-    remove(out->paths[RUN_OUTPUT_TBI]);
-}
-
 void run_outputs_free(run_outputs *out) {
-    active = NULL;
-    pthread_mutex_destroy(&out->mutex);
     for (run_output_file file = 0; file < RUN_OUTPUT_COUNT; ++file) free(out->paths[file]);
     free(out);
 }

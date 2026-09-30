@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check output ownership through process exit and observable file contents."""
+"""Check BGEN partial-file cleanup through process exit and observable file contents."""
 
 import subprocess
 import sys
@@ -8,10 +8,10 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-FIXTURE = Path(sys.argv.pop(1)).resolve() if len(sys.argv) > 1 else ROOT / "build/output/run_outputs_fixture"
+FIXTURE = Path(sys.argv.pop(1)).resolve() if len(sys.argv) > 1 else ROOT / "build/output/bgen_files_fixture"
 
 
-class RunOutputs(unittest.TestCase):
+class BgenFiles(unittest.TestCase):
     def check_mode(self, mode, expected_exit, complete):
         with tempfile.TemporaryDirectory() as tmp:
             prefix = Path(tmp) / "result"
@@ -32,19 +32,19 @@ class RunOutputs(unittest.TestCase):
                 self.assertEqual(sample.read_text(), "untouched sample\n")
 
     def test_closed_partial_members_are_removed(self):
-        self.check_mode("partial", 1, False)
+        self.check_mode("partial", expected_exit=1, complete=False)
 
     def test_completed_members_survive_later_failure(self):
-        self.check_mode("complete", 1, True)
+        self.check_mode("complete", expected_exit=1, complete=True)
 
     def test_caught_reader_error_leaves_outputs_writable(self):
-        self.check_mode("caught", 0, True)
+        self.check_mode("caught", expected_exit=0, complete=True)
 
-    def test_normal_free_disarms_exit_cleanup(self):
-        self.check_mode("normal", 0, True)
+    def test_normal_exit_keeps_completed_members(self):
+        self.check_mode("normal", expected_exit=0, complete=True)
 
     def test_terminal_cleanup_refuses_concurrent_late_open(self):
-        self.check_mode("abort", 1, False)
+        self.check_mode("abort", expected_exit=1, complete=False)
 
 
 if __name__ == "__main__":

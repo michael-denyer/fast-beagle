@@ -30,6 +30,7 @@ struct vcf_index {
 };
 
 vcf_index *vcf_index_new(const char *vcf_path, const char *tbi_path, uint64_t u_header_end) {
+    remove(tbi_path);
     vcf_index *x = util_malloc(sizeof *x);
     *x = (vcf_index){.vcf_path = util_strndup(vcf_path, strlen(vcf_path)),
         .tbi_path = util_strndup(tbi_path, strlen(tbi_path)), .u_header_end = u_header_end,

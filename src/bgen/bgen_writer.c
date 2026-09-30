@@ -22,6 +22,7 @@
 #include <htslib/kstring.h>
 #include <libdeflate.h>
 
+#include "bgen/bgen_files.h"
 #include "bgen/plink2_num.h"
 #include "blbutil/utilities.h"
 
@@ -43,7 +44,6 @@ struct bgen_writer {
     bgen_mode mode;
     FILE *bgen, *info_file;
     const char *bgen_path, *sample_path, *info_path;
-    run_outputs *outputs;
     const samples *samples;
     bool has_min_dr2;
     double min_dr2, min_maf;
@@ -135,11 +135,10 @@ void bgen_writer_check_chrom(bgen_writer *bw, const char *chrom) {
     }
 }
 
-bgen_writer *bgen_writer_open(const par *p, run_outputs *out, const samples *s) {
+bgen_writer *bgen_writer_open(const par *p, const run_outputs *out, const samples *s) {
     bgen_writer *bw = util_malloc(sizeof *bw);
     *bw = (bgen_writer){0};
     bw->mode = p->bgen;
-    bw->outputs = out;
     bw->bgen_path = run_outputs_path(out, RUN_OUTPUT_BGEN);
     bw->sample_path = run_outputs_path(out, RUN_OUTPUT_SAMPLE);
     bw->info_path = run_outputs_path(out, RUN_OUTPUT_INFO);
@@ -154,9 +153,9 @@ bgen_writer *bgen_writer_open(const par *p, run_outputs *out, const samples *s) 
     bw->n_missing = util_malloc((size_t)(s->n > 0 ? s->n : 1) * sizeof *bw->n_missing);
     for (int j = 0; j < s->n; ++j) bw->n_missing[j] = 0;
     bw->chrom_index = -1;
-    bw->bgen = run_outputs_bgen_open(out, RUN_BGEN_DATA);
+    bw->bgen = bgen_files_open(bw->bgen_path);
     if (bw->bgen == NULL) util_exit("Error opening %s", bw->bgen_path);
-    bw->info_file = run_outputs_bgen_open(out, RUN_BGEN_INFO);
+    bw->info_file = bgen_files_open(bw->info_path);
     if (bw->info_file == NULL) util_exit("Error opening %s", bw->info_path);
     fputs("CHROM\tPOS\tID\tREF\tALT\tDR2\tAF\tIMP\n", bw->info_file);
 
@@ -654,7 +653,7 @@ void bgen_writer_put(bgen_writer *bw, bgen_rec *rec) {
 
 /* ExportOxSample: no phenotypes, FID 0, sex unknown. */
 static void write_sample_file(bgen_writer *bw) {
-    FILE *f = run_outputs_bgen_open(bw->outputs, RUN_BGEN_SAMPLE);
+    FILE *f = bgen_files_open(bw->sample_path);
     if (f == NULL) util_exit("Error opening %s", bw->sample_path);
     fputs("ID_1 ID_2 missing sex\n0 0 0 D\n", f);
     double recip = bw->n_variants == 0 ? 0.0 : 1.0 / (double)bw->n_variants;
@@ -680,7 +679,7 @@ void bgen_writer_close(bgen_writer *bw) {
     if (fclose(bw->bgen) != 0) util_exit("Error writing %s", bw->bgen_path);
     if (fclose(bw->info_file) != 0) util_exit("Error writing %s", bw->info_path);
     write_sample_file(bw);
-    run_outputs_bgen_complete(bw->outputs);
+    bgen_files_complete();
     free(bw->rec.s);
     free(bw->n_missing);
     free(bw);
