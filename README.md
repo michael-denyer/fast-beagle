@@ -9,7 +9,7 @@
 
 <img src="docs/logo.jpg" width="144" align="right" alt="Beagle with a DNA helix">
 
-**1.5× to over 3× faster, with over 2× less CPU time and up to 3.5× less memory than Java Beagle 5.5**, and byte-identical output. The gain grows with scale, from a 321-sample public benchmark to a production imputation of about 100,000 samples. [Performance](docs/perf-baseline.md) has both runs.
+**1.5× to over 3× faster, with over 2× less CPU time and up to 3.5× less memory than Java Beagle 5.5**, and byte-identical output. The gain grows with scale, from a 321-sample public benchmark to a production imputation of about 100,000 samples. [Performance](docs/perf-baseline.md) has every run.
 
 fast-beagle is a standalone C port of [Beagle 5.5](https://faculty.washington.edu/browning/beagle/beagle.html) (27Feb25), the genotype phasing and imputation tool. Its output is byte-identical to the Java release run with the same `nthreads=`. It adds BGEN v1.2 output and a tabix index written in the same pass as the VCF.
 
