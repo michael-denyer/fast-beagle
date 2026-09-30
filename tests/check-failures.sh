@@ -74,14 +74,14 @@ if [ "$1" != java ]; then
   vcf_head() { printf '##fileformat=VCFv4.2\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tS1\tS2\n'; }
   rec() { printf '%s\t%s\t.\tA\tC\t.\t.\t.\tGT\t0|1\t%s\n' "$1" "$2" "${3:-1|0}"; }
   lone="java.lang.IllegalArgumentException: Window has only one position: CHROM=1 POS=100"
-  { vcf_head; rec 1 100; rec 2 100; rec 2 200 '1|x'; } | gzip > "$OUT/next-bad.vcf.gz"
-  check next-window-target "$lone" gt="$OUT/next-bad.vcf.gz" out="$OUT/next-target"
-  { vcf_head; rec 1 100; rec 2 100; rec 2 200; } | gzip > "$OUT/next-targ.vcf.gz"
+  { vcf_head; rec 1 100; rec 2 100; rec 2 200 '1|x'; } | gzip > "$OUT/in-next-bad.vcf.gz"
+  check next-window-target "$lone" gt="$OUT/in-next-bad.vcf.gz" out="$OUT/next-target"
+  { vcf_head; rec 1 100; rec 2 100; rec 2 200; } | gzip > "$OUT/in-next-targ.vcf.gz"
   { vcf_head; rec 1 100
     for p in $(seq 100 100 99900); do rec 2 "$p"; done
     for p in $(seq 100 100 10000); do if [ "$p" = 5000 ]; then rec 3 "$p" '1|x'; else rec 3 "$p"; fi; done
-  } | gzip > "$OUT/next-ref.vcf.gz"
-  check next-window-ref "$lone" ref="$OUT/next-ref.vcf.gz" gt="$OUT/next-targ.vcf.gz" out="$OUT/next-ref"
+  } | gzip > "$OUT/in-next-ref.vcf.gz"
+  check next-window-ref "$lone" ref="$OUT/in-next-ref.vcf.gz" gt="$OUT/in-next-targ.vcf.gz" out="$OUT/next-ref"
 fi
 
 # PlinkGenMap throws IllegalArgumentException, and prints a genetic position
