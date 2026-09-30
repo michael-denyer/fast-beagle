@@ -27,20 +27,21 @@
 #include "phase/low_freq_phase_ibs.h"
 #include "phase/low_freq_phase_states.h"
 
-/* HmmStateProbs: forward-backward state probabilities of one target
- * haplotype at stage-1 markers. Java keeps a row for every marker; only the
- * markers with slot[m] >= 0 are read afterwards, so only they get row slot[m]
- * of states and probs. The forward and backward values at every other marker
- * are computed and dropped. The last marker keeps its forward values, as in
- * Java. */
+/* HmmStateProbs: forward-backward state probabilities of a sample's two
+ * haplotypes at stage-1 markers. Java runs one haplotype at a time and keeps
+ * a row for every marker. Only the markers with slot[m] >= 0 are read
+ * afterwards, so only they get row slot[m] of states and probs; the forward
+ * and backward values at every other marker are computed and dropped. The
+ * two haplotypes' HMMs are independent and step through the markers
+ * together. The last marker keeps its forward values, as in Java. */
 typedef struct {
     const phase_data *pd;
     low_freq_phase_states states;
     int n_markers;
     int max_states;
-    uint8_t *mismatch;  /* [marker][state] */
-    float *fwd[2];      /* the forward values at a marker without a row, by marker parity */
-    float *bwd;
+    uint8_t *mismatch[2];   /* per haplotype: [marker][state] */
+    float *fwd[2][2];       /* per haplotype: the forward values at a marker without a row, by marker parity */
+    float *bwd[2];
     float p_mismatch[2];
 } hmm_state_probs;
 
@@ -51,67 +52,83 @@ static void hmm_state_probs_init(hmm_state_probs *hp, const low_freq_phase_ibs *
     hp->n_markers = pd->fpd->n_stage1;
     hp->max_states = max_states;
     low_freq_phase_states_init(&hp->states, ibs, max_states);
-    hp->mismatch = util_malloc((size_t)hp->n_markers * (size_t)max_states);
-    hp->fwd[0] = util_malloc((size_t)max_states * sizeof *hp->fwd[0]);
-    hp->fwd[1] = util_malloc((size_t)max_states * sizeof *hp->fwd[1]);
-    hp->bwd = util_malloc((size_t)max_states * sizeof *hp->bwd);
+    for (int i = 0; i < 2; ++i) {
+        hp->mismatch[i] = util_malloc((size_t)hp->n_markers * (size_t)max_states);
+        hp->fwd[i][0] = util_malloc((size_t)max_states * sizeof *hp->fwd[i][0]);
+        hp->fwd[i][1] = util_malloc((size_t)max_states * sizeof *hp->fwd[i][1]);
+        hp->bwd[i] = util_malloc((size_t)max_states * sizeof *hp->bwd[i]);
+    }
     hp->p_mismatch[0] = 1.0f - pd->p_mismatch;
     hp->p_mismatch[1] = pd->p_mismatch;
 }
 
 static void hmm_state_probs_free(hmm_state_probs *hp) {
-    free(hp->mismatch);
-    free(hp->fwd[0]);
-    free(hp->fwd[1]);
-    free(hp->bwd);
+    for (int i = 0; i < 2; ++i) {
+        free(hp->mismatch[i]);
+        free(hp->fwd[i][0]);
+        free(hp->fwd[i][1]);
+        free(hp->bwd[i]);
+    }
     low_freq_phase_states_free(&hp->states);
 }
 
-static const uint8_t *mismatch_row(const hmm_state_probs *hp, int m) {
-    return hp->mismatch + (size_t)m * (size_t)hp->max_states;
+static const uint8_t *mismatch_row(const hmm_state_probs *hp, int i, int m) {
+    return hp->mismatch[i] + (size_t)m * (size_t)hp->max_states;
 }
 
-static float *fwd_row(const hmm_state_probs *hp, const int *slot, float *probs, int m) {
-    return slot[m] >= 0 ? probs + (size_t)slot[m] * (size_t)hp->max_states : hp->fwd[m & 1];
+static float *fwd_row(const hmm_state_probs *hp, int i, const int *slot, float *probs, int m) {
+    return slot[m] >= 0 ? probs + (size_t)slot[m] * (size_t)hp->max_states : hp->fwd[i][m & 1];
 }
 
-static void run_fwd(const hmm_state_probs *hp, const int *slot, float *probs, int n_states) {
+static void run_fwd(const hmm_state_probs *hp, const int *slot, float *const probs[2], const int n_states[2]) {
     const float *p_recomb = hp->pd->p_recomb;
-    float *prev = fwd_row(hp, slot, probs, 0);
-    float last_sum = 0.0f;
-    for (int j = 0; j < n_states; ++j) {
-        prev[j] = hp->p_mismatch[hp->mismatch[j]];
-        last_sum += prev[j];
+    const float *prev[2] = {NULL, NULL};
+    float sum[2] = {0.0f, 0.0f};
+    for (int i = 0; i < 2; ++i) {
+        float *row = fwd_row(hp, i, slot, probs[i], 0);
+        for (int j = 0; j < n_states[i]; ++j) {
+            row[j] = hp->p_mismatch[hp->mismatch[i][j]];
+            sum[i] += row[j];
+        }
+        prev[i] = row;
     }
     for (int m = 1; m < hp->n_markers; ++m) {
-        float *fwd = fwd_row(hp, slot, probs, m);
-        last_sum = hmm_fwd_update(prev, fwd, last_sum, p_recomb[m], hp->p_mismatch, mismatch_row(hp, m), n_states);
-        prev = fwd;
+        float *fwd[2] = {fwd_row(hp, 0, slot, probs[0], m), fwd_row(hp, 1, slot, probs[1], m)};
+        const uint8_t *mismatch[2] = {mismatch_row(hp, 0, m), mismatch_row(hp, 1, m)};
+        hmm_fwd_update2(prev, fwd, sum, p_recomb[m], hp->p_mismatch, mismatch, n_states);
+        prev[0] = fwd[0];
+        prev[1] = fwd[1];
     }
 }
 
-static void run_bwd(hmm_state_probs *hp, const int *slot, float *probs, int n_states) {
+static void run_bwd(hmm_state_probs *hp, const int *slot, float *const probs[2], const int n_states[2]) {
     const float *p_recomb = hp->pd->p_recomb;
-    float *bwd = hp->bwd;
-    for (int j = 0; j < n_states; ++j) bwd[j] = 1.0f / n_states;
+    for (int i = 0; i < 2; ++i) {
+        for (int j = 0; j < n_states[i]; ++j) hp->bwd[i][j] = 1.0f / n_states[i];
+    }
     for (int m = hp->n_markers - 2; m >= 0; --m) {
-        hmm_bwd_update(bwd, p_recomb[m + 1], hp->p_mismatch, mismatch_row(hp, m + 1), n_states);
+        const uint8_t *mismatch[2] = {mismatch_row(hp, 0, m + 1), mismatch_row(hp, 1, m + 1)};
+        hmm_bwd_update2(hp->bwd, p_recomb[m + 1], hp->p_mismatch, mismatch, n_states);
         if (slot[m] < 0) continue;
-        float *row = probs + (size_t)slot[m] * (size_t)hp->max_states;
-        float sum = 0.0f;
-        for (int j = 0; j < n_states; ++j) {
-            row[j] *= bwd[j];
-            sum += row[j];
+        for (int i = 0; i < 2; ++i) {
+            float *row = probs[i] + (size_t)slot[m] * (size_t)hp->max_states;
+            const float *bwd = hp->bwd[i];
+            float sum = 0.0f;
+            for (int j = 0; j < n_states[i]; ++j) {
+                row[j] *= bwd[j];
+                sum += row[j];
+            }
+            for (int j = 0; j < n_states[i]; ++j) row[j] /= sum;
         }
-        for (int j = 0; j < n_states; ++j) row[j] /= sum;
     }
 }
 
-static int hmm_state_probs_run(hmm_state_probs *hp, int targ_hap, const int *slot, int *states, float *probs) {
-    int n_states = low_freq_phase_states_ibs_states(&hp->states, targ_hap, slot, states, hp->mismatch);
+static void hmm_state_probs_run(hmm_state_probs *hp, int sample, const int *slot, int *const states[2], float *const probs[2], int n_states[2]) {
+    for (int i = 0; i < 2; ++i) {
+        n_states[i] = low_freq_phase_states_ibs_states(&hp->states, (sample << 1) | i, slot, states[i], hp->mismatch[i]);
+    }
     run_fwd(hp, slot, probs, n_states);
     run_bwd(hp, slot, probs, n_states);
-    return n_states;
 }
 
 /* Stage2Baum */
@@ -375,9 +392,7 @@ static void stage2_baum_phase(stage2_baum *b, int sample) {
     b->decisions = TRACE_FNV_BASIS;
     if (b->kept.n == 0) return;
     ensure_rows(b);
-    int h1 = sample << 1;
-    b->n_states[0] = hmm_state_probs_run(&b->hp, h1, b->slot, b->states[0], b->probs[0]);
-    b->n_states[1] = hmm_state_probs_run(&b->hp, h1 | 1, b->slot, b->states[1], b->probs[1]);
+    hmm_state_probs_run(&b->hp, sample, b->slot, b->states, b->probs, b->n_states);
     if (trace_on()) {
         b->digest[0] = digest(b, 0);
         b->digest[1] = digest(b, 1);
