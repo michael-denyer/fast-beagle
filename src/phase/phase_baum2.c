@@ -28,10 +28,12 @@ void phase_baum2_init(phase_baum2 *pb, const pbwt_phase_ibs *ibs) {
     pb->max_states = p->phase_states;
     basic_phase_states_init(&pb->states, ibs, pb->max_states);
     pb->n_states = 0;
-    pb->mismatch = util_malloc(3 * sizeof *pb->mismatch);
+    pb->rows = NULL;
+    pb->rows_cap = 0;
+    pb->zero_row = util_malloc((size_t)pb->max_states);
+    memset(pb->zero_row, 0, (size_t)pb->max_states);
     for (int i = 0; i < 3; ++i) {
-        pb->mismatch[i] = util_malloc((size_t)n_markers * sizeof **pb->mismatch);
-        for (int m = 0; m < n_markers; ++m) pb->mismatch[i][m] = util_malloc((size_t)pb->max_states);
+        pb->mismatch[i] = util_malloc((size_t)n_markers * sizeof *pb->mismatch[i]);
         pb->fwd[i] = util_malloc((size_t)pb->max_states * sizeof *pb->fwd[i]);
         pb->bwd[i] = util_malloc((size_t)pb->max_states * sizeof *pb->bwd[i]);
     }
@@ -46,14 +48,13 @@ void phase_baum2_init(phase_baum2 *pb, const pbwt_phase_ibs *ibs) {
 }
 
 void phase_baum2_free(phase_baum2 *pb) {
-    int n_markers = pb->pd->fpd->n_stage1;
     for (int i = 0; i < 3; ++i) {
-        for (int m = 0; m < n_markers; ++m) free(pb->mismatch[i][m]);
         free(pb->mismatch[i]);
         free(pb->fwd[i]);
         free(pb->bwd[i]);
     }
-    free(pb->mismatch);
+    free(pb->rows);
+    free(pb->zero_row);
     for (int j = 0; j < pb->n_miss_cap; ++j) {
         free(pb->ref_alleles[j]);
         free(pb->bwd_miss1[j]);
@@ -71,8 +72,14 @@ void phase_baum2_free(phase_baum2 *pb) {
     basic_phase_states_free(&pb->states);
 }
 
-static void ensure_capacity(phase_baum2 *pb, int n_unph, int n_miss) {
+static void ensure_capacity(phase_baum2 *pb, int n_clusters, int n_unph, int n_miss) {
     size_t row = (size_t)pb->max_states;
+    size_t n_rows_bytes = 2 * (size_t)n_clusters * row;
+    if (pb->rows_cap < n_rows_bytes) {
+        free(pb->rows);
+        pb->rows = util_malloc(n_rows_bytes);
+        pb->rows_cap = n_rows_bytes;
+    }
     if (pb->n_miss_cap < n_miss) {
         pb->ref_alleles = util_realloc(pb->ref_alleles, (size_t)n_miss * sizeof *pb->ref_alleles);
         pb->bwd_miss1 = util_realloc(pb->bwd_miss1, (size_t)n_miss * sizeof *pb->bwd_miss1);
@@ -153,7 +160,7 @@ static void fwd_step(phase_baum2 *pb, const marker_cluster *mc, int cluster) {
 
 static void swap_haps(phase_baum2 *pb, const marker_cluster *mc, int start_clust, int end_clust) {
     for (int c = start_clust; c < end_clust; ++c) {
-        uint8_t *tmp = pb->mismatch[1][c];
+        const uint8_t *tmp = pb->mismatch[1][c];
         pb->mismatch[1][c] = pb->mismatch[2][c];
         pb->mismatch[2][c] = tmp;
     }
@@ -271,8 +278,8 @@ void phase_baum2_phase(phase_baum2 *pb, int sample, swap_rate *rate) {
         pb->swap_haps = false;
         marker_cluster mc;
         marker_cluster_init(&mc, pb->pd, sample);
-        ensure_capacity(pb, n_unph_hets, n_missing_or_masked);
-        pb->n_states = basic_phase_states_cluster_states(&pb->states, &mc, pb->ref_alleles, pb->mismatch);
+        ensure_capacity(pb, mc.n_clusters, n_unph_hets, n_missing_or_masked);
+        pb->n_states = basic_phase_states_cluster_states(&pb->states, &mc, pb->ref_alleles, pb->mismatch, pb->rows, pb->zero_row);
         bwd_alg(pb, &mc);
         fwd_alg(pb, &mc);
         rate->n_swaps += pb->n_swaps;

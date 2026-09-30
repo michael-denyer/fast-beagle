@@ -36,7 +36,10 @@ typedef struct {
     int max_states;
     basic_phase_states states;
     int n_states;
-    uint8_t ***mismatch;   /* [3][cluster][state]; rows 1 and 2 swap with the haplotypes */
+    const uint8_t **mismatch[3];   /* [3][cluster] -> [state]; rows 1 and 2 swap with the haplotypes */
+    uint8_t *rows;         /* the distinct mismatch rows of the sample being phased */
+    size_t rows_cap;
+    uint8_t *zero_row;     /* max_states zeros: a row with no mismatches */
     float p_mismatch;
     float em_probs[2];
     float *fwd[3];
