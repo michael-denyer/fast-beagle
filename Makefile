@@ -69,7 +69,7 @@ build/jcompat/%_fixture: tests/jcompat/%_fixture.c $(JCOMPAT_OBJ)
 	@mkdir -p $(@D)
 	$(LINK)
 
-build/jcompat/pqueue_fixture: build/obj/beagleutil/comp_hap_queue.o build/obj/blbutil/int_int_map.o build/obj/blbutil/utilities.o
+build/jcompat/pqueue_fixture: build/obj/beagleutil/comp_hap_queue.o build/obj/blbutil/utilities.o
 
 check-bgen-unit: build/bgen/quantise_test build/bgen/info_test build/bgen/pack_test
 	./build/bgen/quantise_test
@@ -110,7 +110,7 @@ check-tracker: build/beagleutil/tracker_test
 	./build/beagleutil/tracker_test
 
 build/beagleutil/tracker_test: tests/beagleutil/tracker_test.c build/obj/beagleutil/comp_hap_queue.o \
-        build/obj/blbutil/int_int_map.o build/obj/blbutil/utilities.o $(JCOMPAT_OBJ)
+        build/obj/blbutil/utilities.o $(JCOMPAT_OBJ)
 	@mkdir -p $(@D)
 	$(LINK)
 

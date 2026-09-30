@@ -27,7 +27,7 @@ void low_freq_phase_states_init(low_freq_phase_states *st, const low_freq_phase_
     st->max_states = max_states;
     int ceil_steps = jnum_d2i(ceil((double)(1.0f / pd->fpd->ibs_step)));
     st->min_steps = ceil_steps > 200 ? ceil_steps : 200;
-    comp_hap_tracker_init(&st->t, max_states);
+    comp_hap_tracker_init(&st->t, max_states, ibs->cs.n_haps);
     size_t n = (size_t)max_states;
     st->comp_hap_hap = util_malloc(n * sizeof *st->comp_hap_hap);
     st->comp_hap_end = util_malloc(n * sizeof *st->comp_hap_end);
