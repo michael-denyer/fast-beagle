@@ -157,6 +157,7 @@ The live checks need `PLINK2` naming the pinned plink2 binary, and fail without 
 `tests/check-sanitizers.sh` builds `build/beagle` and the unit tests of `make check-bgen-unit`, `make check-records`, `make check-tracker` and `make check-block-reader` with AddressSanitizer and UndefinedBehaviorSanitizer in `build/san`. It runs those tests. It then runs every oracle case at 1 and 2 threads as VCF only, with `bgen=plink2` and with `bgen=phased`. The `bgen=plink2` runs skip the cases tagged `nonautosome`, and the `bgen=phased` runs skip the cases tagged `nonfinite`. Every run must exit 0 with the oracle hash and no sanitizer report.
 
 - On Linux, LeakSanitizer also runs, so any memory still allocated at a normal exit fails the check. LeakSanitizer does not support macOS arm64.
+- The build adds `-Wno-pass-failed`. clang cannot vectorise a `#pragma omp simd` loop that holds UndefinedBehaviorSanitizer checks, and `-Werror` would stop the build on its warning. The normal build keeps the warning as an error. GCC ignores the flag.
 
 `make check-bgen-files` checks BGEN partial-file cleanup through subprocess exits and real files. It covers closed partial members, completed members surviving a later failure, captured reader errors, a normal exit, and a concurrent sample open after terminal cleanup. ASan/UBSan and ThreadSanitizer run these checks too. The output refusal checks cover both BGEN modes with read-ahead errors and a pre-existing sample file. On Linux they also verify that completed BGEN files survive a log close failure using `/dev/full`.
 
