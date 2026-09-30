@@ -68,7 +68,7 @@ A second run on 2026-09-28, at commit `c7ee83f` on a busier machine, wrote the s
 
 These runs phase every sample of a 1000 Genomes high-coverage panel without a reference panel, so almost all of their time is spent phasing.
 
-### Input
+### Phasing input
 
 `tests/bench/make_phase.py <panel.vcf.gz> <out.vcf.gz>` keeps every sample and every record except symbolic structural variants and repeats of an earlier POS, REF and ALT, and it removes the phase from each genotype. For chr20 it reads the panel that `tests/bench/fetch-chr20.sh` downloads, and the runs use that script's `chr20.map`:
 
