@@ -78,7 +78,7 @@ Init ==
     /\ cpc = "idle" /\ cur = None
     /\ taken = 0
 
-(* read_batches lines 126-133: wait for a free slot unless stopped, then pop one. *)
+(* read_batches: wait for a free slot unless stopped, then pop one. *)
 ReaderCheck ==
     /\ rpc = "check"
     /\ IF stop
@@ -90,7 +90,7 @@ ReaderCheck ==
             /\ rpc' = "fill"
     /\ UNCHANGED <<readQ, fullQ, content, nextBatch, stop, ppc, pslot, cpc, cur, taken>>
 
-(* read_lines, then lines 135-139: append to read, broadcast, return after the sentinel. *)
+(* read_lines, then read_batches: append to read, broadcast, return after the sentinel. *)
 ReaderPublish ==
     /\ rpc = "fill"
     /\ content' = [content EXCEPT ![rslot] = nextBatch]
@@ -102,7 +102,7 @@ ReaderPublish ==
     /\ cpc' = Wake(cpc)
     /\ UNCHANGED <<freeS, fullQ, stop, pslot, cur, taken>>
 
-(* parse_batches lines 146-155: wait for a read batch unless stopped, then pop it. *)
+(* parse_batches: wait for a read batch unless stopped, then pop it. *)
 ParserCheck ==
     /\ ppc = "check"
     /\ IF stop
@@ -114,7 +114,7 @@ ParserCheck ==
             /\ ppc' = "parse"
     /\ UNCHANGED <<freeS, fullQ, content, nextBatch, stop, rpc, rslot, cpc, cur, taken>>
 
-(* parse_batch, then lines 158-163: append to full, broadcast, return after the sentinel. *)
+(* parse_batch, then parse_batches: append to full, broadcast, return after the sentinel. *)
 ParserPublish ==
     /\ ppc = "parse"
     /\ fullQ' = Append(fullQ, pslot)
@@ -124,41 +124,38 @@ ParserPublish ==
     /\ cpc' = Wake(cpc)
     /\ UNCHANGED <<freeS, readQ, content, nextBatch, stop, rslot, cur, taken>>
 
-(* Lines 191-195: wait while full is empty, else take its head and broadcast.
-   r and p are the reader's and parser's pcs after any earlier broadcast. *)
-TakeOrWait(r, p) ==
+(* block_reader_next's wait loop: wait while full is empty, else take its
+   head. Nothing waits for full to shrink, so taking needs no broadcast. *)
+TakeOrWait ==
     IF fullQ = <<>>
       THEN /\ cpc' = "wait"
            /\ cur' = None
-           /\ rpc' = r
-           /\ ppc' = p
            /\ UNCHANGED <<fullQ, taken>>
       ELSE /\ cur' = Head(fullQ)
            /\ fullQ' = Tail(fullQ)
            /\ taken' = taken + 1
            /\ cpc' = "idle"
-           /\ rpc' = Wake(r)
-           /\ ppc' = Wake(p)
 
-(* block_reader_next with cur exhausted, lines 186-196: return cur to free
-   and broadcast (lines 187-190), then take or wait. After the sentinel the
-   call returns at line 184 without locking, so it is not a step here. *)
+(* block_reader_next with cur exhausted: return cur to free and broadcast,
+   then take or wait. After the sentinel the call returns without locking,
+   so it is not a step here. *)
 ConsumerNext ==
     /\ cpc = "idle" /\ ~SeenEnd
     /\ IF cur = None
-         THEN /\ freeS' = freeS
-              /\ TakeOrWait(rpc, ppc)
+         THEN UNCHANGED <<freeS, rpc, ppc>>
          ELSE /\ freeS' = Append(freeS, cur)
-              /\ TakeOrWait(Wake(rpc), Wake(ppc))
+              /\ rpc' = Wake(rpc)
+              /\ ppc' = Wake(ppc)
+    /\ TakeOrWait
     /\ UNCHANGED <<readQ, content, nextBatch, stop, rslot, pslot>>
 
-(* The consumer's re-check after a wakeup, line 191. *)
+(* The consumer's re-check after a wakeup. *)
 ConsumerCheck ==
     /\ cpc = "check"
-    /\ TakeOrWait(rpc, ppc)
-    /\ UNCHANGED <<freeS, readQ, content, nextBatch, stop, rslot, pslot>>
+    /\ TakeOrWait
+    /\ UNCHANGED <<freeS, readQ, content, nextBatch, stop, rpc, rslot, ppc, pslot>>
 
-(* block_reader_close lines 209-214: set stop, broadcast, then join both threads. *)
+(* block_reader_close: set stop, broadcast, then join both threads. *)
 Close ==
     /\ MayClose
     /\ cpc = "idle"

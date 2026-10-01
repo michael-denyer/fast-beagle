@@ -28,7 +28,7 @@ To check fast-beagle, run `tests/check-oracle.sh build/beagle`.
 - a 2-marker target and a 3-marker, 2-sample reference, whose middle marker `err=0` imputes with `AF=NaN`
 - for `tests/check-bgen.sh`, the chrX split moved to chromosome 22 and the reference/target split moved to chromosome 38
 
-The script records in `data/.fixtures.sha256` a hash of itself, the three case tables, the jars and every fixture. With `--ensure` it keeps the existing fixtures while every hash still matches, and regenerates them otherwise. Without `--ensure` it always regenerates the derived fixtures. The gate's `fixtures` step and the case runners pass `--ensure`. CI restores `data/` from a cache keyed on the hash of `tests/fetch-fixtures.sh`, so a job with a cache hit only checks the hashes. Before it regenerates, the script runs `java -version` and exits 1 with a `FAIL` line when `java` cannot run, as with the macOS `/usr/bin/java` placeholder, and every runner that sources `tests/cases.sh` stops with a `FAIL fixtures` line when the script fails.
+The script records in `data/.fixtures.sha256` a hash of itself, the three case tables, the jars and every fixture. With `--ensure` it keeps the existing fixtures while every hash still matches, and regenerates them otherwise. Without `--ensure` it always regenerates the derived fixtures. The gate's `fixtures` step and the case runners pass `--ensure`. CI restores `data/` from a cache keyed on the hash of `tests/fetch-fixtures.sh`, so a job with a cache hit only checks the hashes. Before it regenerates, the script runs `java -version` and exits 1 with a `FAIL` line when `java` cannot run, as with the macOS `/usr/bin/java` placeholder. `tests/check-tla.sh` does the same before it runs TLC. Every runner that sources `tests/cases.sh` stops with a `FAIL fixtures` line when the script fails.
 
 ## Oracle hashes
 
@@ -98,6 +98,7 @@ The check builds `build/beagle-piece1` with one marker per work item. It runs `b
 - `make check-block-reader` forces a published batch to be consumed and refilled with EOF before the parser resumes. The parser must still publish the EOF sentinel (`tests/vcf/block_reader_test.c`).
 - `make check-records`: `tests/output/record_fixture.c` writes phased, imputed, genotyped, haploid and multiallelic records through the window writer with no BGEN and in both `bgen=` modes. `tests/check_records.py` requires the same VCF from all three runs and the expected VCF fields. It also requires phased BGEN probabilities captured before the VCF rounds them.
 - `make check-tracker` tests the composite haplotype tracker in `src/beagleutil/comp_hap_queue.c` through the interface every caller uses (`tests/beagleutil/tracker_test.c`).
+- `make check-oom` requests an allocation that cannot succeed inside `util_try`. The process must exit 1 with `ERROR: out of memory`, and not return to the `util_try` frame (`tests/blbutil/oom_test.c`).
 - `make check-bgen-unit` tests:
   - the scaling rule, exactly (`tests/bgen/quantise_test.c`)
   - the packing of values at 1 to 16 bits (`tests/bgen/pack_test.c`)
@@ -178,7 +179,7 @@ The live checks need `PLINK2` naming the pinned plink2 binary, and fail without 
 
 ## Model check the thread protocols
 
-`tests/check-tla.sh` model-checks the TLA+ specs in `tla/` with TLC from tla2tools.jar v1.7.4 over a matrix of small constants. `tests/check-tla.sh BlockReader` runs one spec. Every model represents a condition-variable wait as a wait set that only a broadcast or a spurious wakeup leaves, and the woken thread retakes the mutex before it rereads the state, so a lost wakeup fails a liveness property.
+`tests/check-tla.sh` model-checks the TLA+ specs in `tla/` with TLC from tla2tools.jar v1.7.4 over a matrix of small constants. `tests/check-tla.sh BlockReader` runs one spec. The three protocol models take each critical section as one step. They represent a condition-variable wait as a wait set that only a broadcast or a spurious wakeup leaves, so a lost wakeup fails a liveness property. The specs name the C functions they model.
 
 [tla/ParallelOrdered.tla](../tla/ParallelOrdered.tla) is the protocol of `parallel_ordered` (the pipelined imputed writer and the phased-record writer), for several worker counts, item counts and windows. It checks that:
 
@@ -192,7 +193,9 @@ The live checks need `PLINK2` naming the pinned plink2 binary, and fail without 
 
 [tla/SlidingWindow.tla](../tla/SlidingWindow.tla) is the read-ahead hand-over of `src/vcf/sliding_window.c`, for 1 to 4 windows, with the reader able to fail at any window. It checks that the caller receives windows in order with none skipped, duplicated, or delivered after NULL or after an error, that an error producing window k+1 is seen only after windows 1..k were taken, that `sliding_window_close` frees `ahead` at most once and leaks no window, and that `sliding_window_next` and `sliding_window_close` always return.
 
-[tla/FatalExit.tla](../tla/FatalExit.tla) is the fatal-error lifecycle of `util_exit` across the main thread, the read-ahead reader (which runs under `util_try`) and a parse worker: a `util_exit` under `util_try` longjmps to its frame and is raised later by the frame's consumer, a `util_exit` outside one calls `exit()` once and pauses every later caller, and `exit()` runs `remove_partial` from `src/bgen/bgen_files.c`. It checks that the process always terminates once a thread exits, that no partial BGEN member survives an exit and none is created after the cleanup, that completed members survive, that a deferred error is raised or discarded by close and never lost, and that no thread blocks forever on a lock a `longjmp` left held. Its constant `ChromLeaksLock = TRUE` is the `chrom_ids.c` that called `str_set_index` under its lock: an out-of-memory `util_exit` on the reader left the lock held and the main thread hung in `chrom_ids_id` with no message, which fails `NoLockDeadlock` and `DeferredRaised`. The gate runs the one-worker model with `ChromLeaksLock = FALSE`, the code now; two workers pass the invariants but their liveness pass runs past ten minutes.
+[tla/FatalExit.tla](../tla/FatalExit.tla) is the fatal-error lifecycle of `util_exit` and `util_oom` across the main thread, the read-ahead reader (which runs under `util_try`) and one or two parse workers. A `util_exit` under `util_try` longjmps to its frame and is raised later by the frame's consumer. A `util_exit` outside one, or a `util_oom` anywhere, calls `exit()` once and pauses every later caller. The model takes from the code that an input error is raised outside the `chrom_ids` lock and that only an allocation can fail under it. It checks that the process always terminates once a thread exits, that the reader's deferred error is raised unless another exit comes first, that the lock is released or the process ends, and that the main thread never blocks on the lock forever. `make check-oom` tests the C side of the allocation rule.
+
+[tla/BgenCleanup.tla](../tla/BgenCleanup.tla) is the partial-output cleanup of `src/bgen/bgen_files.c`, with `exit()` able to start at any point while the other threads keep running. It checks that once `remove_partial` ran no partial BGEN member is on disk and none is created, and that completed members survive.
 
 ## Benchmark
 
@@ -209,7 +212,7 @@ Each check belongs to one group, so CI can run the groups as parallel jobs. `GAT
 | Group | Checks |
 | --- | --- |
 | `setup` | `fixtures` and `c-build`. They run in every group, because every other group needs the fixtures and the `bgen`, `trace`, `trace-threads` and C-binary checks need `build/beagle`. |
-| `core` | `gate-tier`, `log-recording`, `make-phase`, `jcompat`, `tracker`, `interval`, `oracle-c`, `gate-planning`, `failures-c`, `output-failures`, `log-c`, `piece-size`, `bgen-unit`, `records`, `bgen-files`, `vcf-index`, `tbi`, `tla`, `fuzz` and `fuzz-regressions` |
+| `core` | `gate-tier`, `log-recording`, `make-phase`, `jcompat`, `tracker`, `oom`, `interval`, `oracle-c`, `gate-planning`, `failures-c`, `output-failures`, `log-c`, `piece-size`, `bgen-unit`, `records`, `bgen-files`, `vcf-index`, `tbi`, `tla`, `fuzz` and `fuzz-regressions` |
 | `bgen` | `bgen` |
 | `java` | `oracle-jar`, `failures-jar`, `log-jar`, `java-build`, `oracle-source`, `java-trace`, `oracle-trace`, `trace` and `trace-threads` |
 | `cases` | `cases` |
