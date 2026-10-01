@@ -46,7 +46,7 @@ The port threads the loops that dominate run time:
 - imputation per haplotype
 - the imputed writer, which builds records on worker threads and prints them in order
 
-`nthreads=` sets both the thread count and the partitions that Beagle's output depends on, so the output matches Beagle run with the same thread count. [tla/ParallelOrdered.tla](../tla/ParallelOrdered.tla) models the protocol of `parallel_ordered`, the pipelined imputed writer, and [tla/BlockReader.tla](../tla/BlockReader.tla) and [tla/SlidingWindow.tla](../tla/SlidingWindow.tla) the reference-reading pipeline and the read-ahead hand-over ([model check](testing.md#model-check-the-thread-protocols)).
+`nthreads=` sets both the thread count and the partitions that Beagle's output depends on, so the output matches Beagle run with the same thread count. [tla/ParallelOrdered.tla](../tla/ParallelOrdered.tla) models the protocol of `parallel_ordered`, the pipelined imputed writer, and [tla/BlockReader.tla](../tla/BlockReader.tla) and [tla/SlidingWindow.tla](../tla/SlidingWindow.tla) the reference-reading pipeline and the read-ahead hand-over, and `tla/FatalExit.tla` the fatal-error lifecycle of `util_exit` across threads ([model check](testing.md#model-check-the-thread-protocols)).
 
 The imputation writer splits a long cluster into work items of at most `PIECE_RECORDS` reference markers (500). `PIECE_RECORDS` is a tuning value that must not change the output ([piece size check](testing.md#piece-size-check)).
 
