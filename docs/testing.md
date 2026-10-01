@@ -176,9 +176,11 @@ The live checks need `PLINK2` naming the pinned plink2 binary, and fail without 
 - The script shrinks a failure to a small input and saves it in `build/fuzz-fail` with both commands. Inputs from past failures go in `tests/fuzz-regressions/`, which runs first.
 - The full tier runs a fixed set of 200 examples (about 30 s per 100 on an M5) and 2 for each invalid-parameter change. The nightly CI run fuzzes 1000 new examples on each runner. `uv run --python 3.12 --script tests/check_fuzz.py --examples 1000 --random` tries new ones.
 
-## Model check the pipelined writer
+## Model check the thread protocols
 
-`tests/check-tla.sh` model-checks [tla/ParallelOrdered.tla](../tla/ParallelOrdered.tla), the protocol of `parallel_ordered` (the pipelined imputed writer). It runs TLC from tla2tools.jar v1.7.4 for several worker counts, item counts and windows. It checks that:
+`tests/check-tla.sh` model-checks the TLA+ specs in `tla/` with TLC from tla2tools.jar v1.7.4 over a matrix of small constants. `tests/check-tla.sh BlockReader` runs one spec. Every model represents a condition-variable wait as a wait set that only a broadcast or a spurious wakeup leaves, and the woken thread retakes the mutex before it rereads the state, so a lost wakeup fails a liveness property.
+
+[tla/ParallelOrdered.tla](../tla/ParallelOrdered.tla) is the protocol of `parallel_ordered` (the pipelined imputed writer and the phased-record writer), for several worker counts, item counts and windows. It checks that:
 
 - at most `window` items are claimed but not consumed
 - no slot is overwritten before it is consumed
@@ -186,7 +188,9 @@ The live checks need `PLINK2` naming the pinned plink2 binary, and fail without 
 - there is no deadlock
 - every run finishes with every item consumed
 
-The model represents condition-variable waits with wait sets and spurious wakeups, so a lost wakeup fails the check.
+[tla/BlockReader.tla](../tla/BlockReader.tla) is the three-stage pipeline of `src/vcf/block_reader.c` (reader thread, parser thread, consumer), for 1 to 4 slots and 0 to 5 batches, with and without a `block_reader_close` at an arbitrary point. It checks that every slot is in exactly one of free, read, full or a thread's hands, that batches reach the consumer in file order, that `block_reader_next` and `block_reader_close` always return, and that a run without close reaches the end-of-file batch. The 1-slot runs are the boundary where the broadcast after a slot is recycled matters: without it the three threads all wait on `changed` after the first batch.
+
+[tla/SlidingWindow.tla](../tla/SlidingWindow.tla) is the read-ahead hand-over of `src/vcf/sliding_window.c`, for 1 to 4 windows, with the reader able to fail at any window. It checks that the caller receives windows in order with none skipped, duplicated, or delivered after NULL or after an error, that an error producing window k+1 is seen only after windows 1..k were taken, that `sliding_window_close` frees `ahead` at most once and leaks no window, and that `sliding_window_next` and `sliding_window_close` always return.
 
 ## Benchmark
 
