@@ -38,14 +38,19 @@ pkgbuild --root "$root" --install-location / --identifier io.github.michael-deny
   --version "$version" --sign "$installer" --timestamp "$pkg"
 pkgutil --check-signature "$pkg"
 
-# notarytool exits 0 for a rejected submission, so read the status.
-xcrun notarytool submit "$pkg" --key "$NOTARY_KEY" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" \
-  --wait --output-format json | tee "$root/notary.json"
-echo
-id=$(sed -n 's/.*"id" *: *"\([^"]*\)".*/\1/p' "$root/notary.json")
-if ! grep -q '"status" *: *"Accepted"' "$root/notary.json"; then
-  xcrun notarytool log "$id" --key "$NOTARY_KEY" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" >&2 || true
-  echo "build-pkg.sh: Apple did not accept the installer for notarisation" >&2
+notary=(--key "$NOTARY_KEY" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID")
+# Lists the earlier submissions, which fails at once on a key Apple rejects,
+# before the upload and the wait.
+xcrun notarytool history "${notary[@]}"
+id=$(xcrun notarytool submit "$pkg" "${notary[@]}" --output-format json | sed -n 's/.*"id" *: *"\([^"]*\)".*/\1/p')
+echo "notary submission $id"
+# The wait can time out and notarytool exits 0 for a rejected submission, so
+# read the status afterwards.
+xcrun notarytool wait "$id" "${notary[@]}" --timeout 45m || true
+status=$(xcrun notarytool info "$id" "${notary[@]}" --output-format json | sed -n 's/.*"status" *: *"\([^"]*\)".*/\1/p')
+if [ "$status" != Accepted ]; then
+  xcrun notarytool log "$id" "${notary[@]}" >&2 || true
+  echo "build-pkg.sh: notary submission $id is $status, not Accepted" >&2
   exit 1
 fi
 xcrun stapler staple "$pkg"

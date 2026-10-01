@@ -280,7 +280,7 @@ jobs:
     needs: [source, binaries]
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: macos-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       VERSION: ${{ needs.source.outputs.version }}
       PACKAGE: fast-beagle-${{ needs.source.outputs.version }}-macos-arm64
