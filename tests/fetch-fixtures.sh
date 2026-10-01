@@ -19,7 +19,7 @@ cd "$DATA"
 # The bref3 fixtures need a JDK. macOS has a /usr/bin/java that only prints
 # how to install one, so run it rather than look for it.
 java -version > /dev/null 2>&1 || {
-  echo "FAIL java cannot run, and the bref3 fixtures need it: put a JDK first on PATH (PATH=/opt/homebrew/opt/openjdk/bin:\$PATH)" >&2
+  echo "FAIL java cannot run, and the bref3 fixtures need it: put a JDK first on PATH" >&2
   exit 1
 }
 

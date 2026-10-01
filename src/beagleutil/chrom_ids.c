@@ -14,20 +14,18 @@
 #include "blbutil/str_set.h"
 #include "blbutil/utilities.h"
 
-/* Shared by the reader threads, the parse workers and the main thread. Nothing
- * under the lock may call util_exit: on a thread inside util_try it longjmps
- * past the unlock, and every later caller then blocks forever
- * (tla/FatalExit.tla, ChromLeaksLock). */
+/* Shared by the reader threads, the parse workers and the main thread. Under
+ * the lock only an allocation can fail, and util_oom does not unwind: a
+ * util_exit there would longjmp out of a util_try past the unlock. */
 static str_set *ids;
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 int chrom_ids_index(const char *id, size_t len) {
     if (len == 0) util_exit("id.isEmpty()");
     pthread_mutex_lock(&lock);
-    if (ids == NULL) ids = str_set_try_new();
-    int index = ids == NULL ? STR_SET_OOM : str_set_try_index(ids, id, len);
+    if (ids == NULL) ids = str_set_new();
+    int index = str_set_index(ids, id, len);
     pthread_mutex_unlock(&lock);
-    if (index == STR_SET_OOM) util_exit("ERROR: out of memory");
     return index;
 }
 

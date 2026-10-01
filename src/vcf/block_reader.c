@@ -192,7 +192,6 @@ ref_gt_rec *block_reader_next(block_reader *r) {
         r->cur = r->full[r->full_head];
         r->full_head = (r->full_head + 1) % BLOCK_READER_SLOTS;
         --r->n_full;
-        pthread_cond_broadcast(&r->changed);
         pthread_mutex_unlock(&r->mutex);
         r->cur_next = 0;
         if (r->cur->n == 0) return NULL;
