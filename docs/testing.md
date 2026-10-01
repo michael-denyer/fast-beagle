@@ -194,7 +194,7 @@ The live checks need `PLINK2` naming the pinned plink2 binary, and fail without 
 
 ## Benchmark
 
-`tests/bench/` holds the 1000 Genomes chr20 benchmark. `fetch-chr20.sh <dir>` downloads and derives the inputs, and `bench.sh <dir> <rounds>` times Java and C alternately. [perf-baseline.md](perf-baseline.md) has the method and the current result.
+`tests/bench/` holds the 1000 Genomes chr20 benchmark. `fetch-chr20.sh <dir>` downloads and derives the inputs, and `bench.sh <dir> <rounds>` times Java and C alternately. [perf-baseline.md](perf-baseline.md) has the method and the current result. `make_phase.py` builds the phasing inputs, and `tests/check_make_phase.py` checks the records and genotypes it keeps, with and without a position range.
 
 ## Run the pre-merge gate
 
@@ -207,7 +207,7 @@ Each check belongs to one group, so CI can run the groups as parallel jobs. `GAT
 | Group | Checks |
 | --- | --- |
 | `setup` | `fixtures` and `c-build`. They run in every group, because every other group needs the fixtures and the `bgen`, `trace`, `trace-threads` and C-binary checks need `build/beagle`. |
-| `core` | `gate-tier`, `log-recording`, `jcompat`, `tracker`, `interval`, `oracle-c`, `gate-planning`, `failures-c`, `output-failures`, `log-c`, `piece-size`, `bgen-unit`, `records`, `bgen-files`, `vcf-index`, `tbi`, `tla`, `fuzz` and `fuzz-regressions` |
+| `core` | `gate-tier`, `log-recording`, `make-phase`, `jcompat`, `tracker`, `interval`, `oracle-c`, `gate-planning`, `failures-c`, `output-failures`, `log-c`, `piece-size`, `bgen-unit`, `records`, `bgen-files`, `vcf-index`, `tbi`, `tla`, `fuzz` and `fuzz-regressions` |
 | `bgen` | `bgen` |
 | `java` | `oracle-jar`, `failures-jar`, `log-jar`, `java-build`, `oracle-source`, `java-trace`, `oracle-trace`, `trace` and `trace-threads` |
 | `cases` | `cases` |
