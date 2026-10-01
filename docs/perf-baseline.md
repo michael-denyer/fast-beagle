@@ -70,13 +70,23 @@ These runs phase every sample of a 1000 Genomes high-coverage panel without a re
 
 ### Phasing input
 
-`tests/bench/make_phase.py <panel.vcf.gz> <out.vcf.gz>` keeps every sample and every record except symbolic structural variants and repeats of an earlier POS, REF and ALT, and it removes the phase from each genotype. For chr20 it reads the panel that `tests/bench/fetch-chr20.sh` downloads, and the runs use that script's `chr20.map`:
+`tests/bench/make_phase.py <panel.vcf.gz> <out.vcf.gz> [<first>-<last>]` keeps every sample and every record except symbolic structural variants and repeats of an earlier POS, REF and ALT, and it removes the phase from each genotype. With `<first>-<last>`, it keeps only the records whose POS is in that range. For chr20 it reads the panel that `tests/bench/fetch-chr20.sh` downloads, and the runs use that script's `chr20.map`:
 
 ```bash
 python3 tests/bench/make_phase.py ~/beagle-bench/1kGP_high_coverage_Illumina.chr20.filtered.SNV_INDEL_SV_phased_panel.vcf.gz ~/beagle-bench/chr20.phase.vcf.gz
 ```
 
-The chr1 and chrX inputs come from the same release's chr1 panel and chrX `v2` panel, with the maps in the `chr_in_chrom_field` folder of Beagle's GRCh38 map zip. chrX keeps only the region outside the pseudoautosomal regions (positions 2,781,480 to 155,701,382), because Beagle needs one ploidy per sample and male samples are diploid inside those regions.
+The chr1 and chrX inputs come from the same release's chr1 panel and chrX `v2` panel, with the maps in the `chr_in_chrom_field` folder of Beagle's GRCh38 map zip. chrX keeps only the region outside the pseudoautosomal regions (positions 2,781,480 to 155,701,382), because Beagle needs one ploidy per sample and male samples are diploid inside those regions. Without the range, both tools reject the chrX input.
+
+```bash
+base=https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV
+curl -fSLO "$base/1kGP_high_coverage_Illumina.chr1.filtered.SNV_INDEL_SV_phased_panel.vcf.gz"
+curl -fSLO "$base/1kGP_high_coverage_Illumina.chrX.filtered.SNV_INDEL_SV_phased_panel.v2.vcf.gz"
+python3 tests/bench/make_phase.py 1kGP_high_coverage_Illumina.chr1.filtered.SNV_INDEL_SV_phased_panel.vcf.gz chr1.phase.vcf.gz
+python3 tests/bench/make_phase.py 1kGP_high_coverage_Illumina.chrX.filtered.SNV_INDEL_SV_phased_panel.v2.vcf.gz chrX.phase.vcf.gz 2781480-155701382
+unzip -o -p ~/beagle-bench/plink.GRCh38.map.zip chr_in_chrom_field/plink.chrchr1.GRCh38.map > chr1.map
+unzip -o -p ~/beagle-bench/plink.GRCh38.map.zip chr_in_chrom_field/plink.chrchrX.GRCh38.map > chrX.map
+```
 
 | Input | Samples | Records |
 |---|---|---|
