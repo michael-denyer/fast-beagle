@@ -96,13 +96,26 @@ EOF
   done
 }
 
+fatal_exit() {
+  CHECKS="INVARIANTS TypeOK LocksConsistent NoPartialAfterExit NoCreateAfterCleanup CompletedSurvive ErrorNotLost
+PROPERTIES Terminates NoLockDeadlock DeferredRaised"
+  # ChromLeaksLock = TRUE, the chrom_ids.c before str_set_try_index, fails
+  # NoLockDeadlock and DeferredRaised. Two workers pass the invariants but
+  # the liveness pass runs past ten minutes, so the gate checks one.
+  check FatalExit "workers=1 chrom-unlocks" <<EOF
+  Workers = {w1}
+  ChromLeaksLock = FALSE
+EOF
+}
+
 specs=("$@")
-[ ${#specs[@]} -gt 0 ] || specs=(ParallelOrdered BlockReader SlidingWindow)
+[ ${#specs[@]} -gt 0 ] || specs=(ParallelOrdered BlockReader SlidingWindow FatalExit)
 for spec in "${specs[@]}"; do
   case $spec in
     ParallelOrdered) parallel_ordered ;;
     BlockReader) block_reader ;;
     SlidingWindow) sliding_window ;;
+    FatalExit) fatal_exit ;;
     *) echo "FAIL unknown spec $spec"; fail=1 ;;
   esac
 done
