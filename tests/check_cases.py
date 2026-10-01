@@ -67,8 +67,9 @@ def main():
         java.chmod(0o755)
         env = dict(os.environ, PATH=f"{fake_bin}:{os.environ['PATH']}")
         missing.unlink()
-        run(root, prepare, env=env, ok=False)
+        failed = run(root, prepare, env=env, ok=False).stderr
         assert not manifest.exists()
+        assert "FAIL java cannot run" in failed and "FAIL fixtures" in failed, failed
         print("PASS failed preparation stops runner and invalidates manifest")
         run(root, prepare)
         print("PASS interrupted fixture generation recovers")
